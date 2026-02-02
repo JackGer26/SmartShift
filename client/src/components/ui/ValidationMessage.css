@@ -301,6 +301,7 @@
 
 .validation-message[role="alert"] {
   /* Screen readers will announce this immediately */
+  position: relative;
 }
 
 .validation-dismiss:focus {
