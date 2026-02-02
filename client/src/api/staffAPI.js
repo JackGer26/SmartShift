@@ -40,3 +40,10 @@ export const staffAPI = {
    */
   delete: (id) => api.delete(`/staff/${id}`),
 };
+
+// Named exports for backward compatibility
+export const getAllStaff = staffAPI.getAll;
+export const getStaffById = staffAPI.getById;
+export const createStaff = staffAPI.create;
+export const updateStaff = staffAPI.update;
+export const deleteStaff = staffAPI.delete;
