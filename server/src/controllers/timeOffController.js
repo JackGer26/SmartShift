@@ -138,10 +138,62 @@ const deleteTimeOff = async (req, res, next) => {
   }
 };
 
+// @desc    Get time off requests within date range
+// @route   GET /api/time-off/range?from=2024-01-01&to=2024-01-31
+// @access  Public
+const getTimeOffByDateRange = async (req, res, next) => {
+  try {
+    const { from, to, status, staffId } = req.query;
+    
+    // Build filter object
+    const filter = {};
+    
+    if (from || to) {
+      filter.$or = [];
+      
+      // Find time off that overlaps with the date range
+      if (from && to) {
+        filter.$or.push({
+          $and: [
+            { startDate: { $lte: new Date(to) } },
+            { endDate: { $gte: new Date(from) } }
+          ]
+        });
+      } else if (from) {
+        filter.endDate = { $gte: new Date(from) };
+      } else if (to) {
+        filter.startDate = { $lte: new Date(to) };
+      }
+    }
+    
+    if (status) {
+      filter.status = status;
+    }
+    
+    if (staffId) {
+      filter.staffId = staffId;
+    }
+
+    const timeOff = await TimeOff.find(filter)
+      .populate('staffId', 'name email role')
+      .sort({ startDate: 1 });
+
+    res.json({
+      success: true,
+      count: timeOff.length,
+      data: timeOff,
+      dateRange: { from, to }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllTimeOff,
   getTimeOffByStaff,
   getTimeOffById,
+  getTimeOffByDateRange,
   createTimeOff,
   updateTimeOff,
   deleteTimeOff

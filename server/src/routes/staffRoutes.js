@@ -6,22 +6,30 @@ const {
   updateStaff,
   deleteStaff
 } = require('../controllers/staffController');
+const { validateStaff, validateObjectId } = require('../utils/validation');
 
+/**
+ * Staff Routes - Restaurant Employee Management
+ * 
+ * Comprehensive CRUD operations for restaurant staff with validation.
+ * Supports filtering by role, active status, and availability.
+ */
 const router = express.Router();
 
-// GET /api/staff - Get all staff members
+// GET /api/staff - Get all staff members with optional filtering
+// Query params: role, isActive, availableOn (day)
 router.get('/', getAllStaff);
 
 // GET /api/staff/:id - Get specific staff member
-router.get('/:id', getStaffById);
+router.get('/:id', validateObjectId, getStaffById);
 
 // POST /api/staff - Create new staff member
-router.post('/', createStaff);
+router.post('/', validateStaff, createStaff);
 
 // PUT /api/staff/:id - Update staff member
-router.put('/:id', updateStaff);
+router.put('/:id', validateObjectId, validateStaff, updateStaff);
 
-// DELETE /api/staff/:id - Delete staff member
-router.delete('/:id', deleteStaff);
+// DELETE /api/staff/:id - Soft delete staff member (set isActive = false)
+router.delete('/:id', validateObjectId, deleteStaff);
 
 module.exports = router;
