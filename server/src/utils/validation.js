@@ -226,7 +226,16 @@ const validateObjectId = [
  * Date validation for rota week
  */
 const validateWeekDate = [
-  param('date').isISO8601().withMessage('Date must be in YYYY-MM-DD format'),
+  param('date')
+    .isISO8601()
+    .withMessage('Date must be in YYYY-MM-DD format')
+    .custom((value) => {
+      const date = new Date(value);
+      if (isNaN(date.getTime())) {
+        throw new Error('Invalid date provided');
+      }
+      return true;
+    }),
   handleValidationErrors
 ];
 

@@ -1,31 +1,66 @@
 const RotaWeek = require('../models/RotaWeek');
+const Staff = require('../models/Staff');
 const rotaGenerationService = require('../services/rotaGenerationService');
-const { getWeekStart } = require('../utils/dateUtils');
+const asyncHandler = require('../utils/asyncHandler');
+const { NotFoundError, ValidationError } = require('../utils/errors');
+const { getWeekStart, getDayName } = require('../utils/dateUtils');
+const { Parser } = require('json2csv');
 
 /**
  * Rota Controller
  * Handles rota generation, viewing, and management
  */
 
-// @desc    Get all rota weeks
-// @route   GET /api/rota
+// @desc    Get all rota weeks with filtering and pagination
+// @route   GET /api/rota?status=draft&from=2024-01-01&to=2024-12-31&limit=10&offset=0
 // @access  Public
-const getAllRotaWeeks = async (req, res, next) => {
-  try {
-    const rotas = await RotaWeek.find()
-      .sort({ weekStartDate: -1 })
-      .populate('shifts.staffId', 'name email role')
-      .populate('shifts.shiftTemplateId', 'name requiredRole');
+const getAllRotaWeeks = asyncHandler(async (req, res) => {
+  const {
+    status,
+    from,
+    to,
+    limit = 20,
+    offset = 0,
+    sortBy = 'weekStartDate',
+    order = 'desc'
+  } = req.query;
 
-    res.json({
-      success: true,
-      count: rotas.length,
-      data: rotas
-    });
-  } catch (error) {
-    next(error);
+  // Build filter object
+  const filter = {};
+  if (status) filter.status = status;
+  if (from || to) {
+    filter.weekStartDate = {};
+    if (from) filter.weekStartDate.$gte = new Date(from);
+    if (to) filter.weekStartDate.$lte = new Date(to);
   }
-};
+
+  // Build sort object
+  const sortOrder = order === 'desc' ? -1 : 1;
+  const sort = { [sortBy]: sortOrder };
+
+  const [rotas, total] = await Promise.all([
+    RotaWeek.find(filter)
+      .sort(sort)
+      .limit(Math.min(parseInt(limit), 50))
+      .skip(parseInt(offset))
+      .populate('shifts.staffId', 'name email role hourlyRate')
+      .populate('shifts.shiftTemplateId', 'name requiredRole dayOfWeek')
+      .select('-__v'),
+    RotaWeek.countDocuments(filter)
+  ]);
+
+  res.json({
+    success: true,
+    count: rotas.length,
+    total,
+    data: rotas,
+    pagination: {
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      hasMore: parseInt(offset) + rotas.length < total
+    }
+  });
+});
 
 // @desc    Get rota week by ID
 // @route   GET /api/rota/:id
@@ -52,40 +87,45 @@ const getRotaWeekById = async (req, res, next) => {
   }
 };
 
-// @desc    Get rota week by date
+// @desc    Get rota week by week start date
 // @route   GET /api/rota/week/:date
 // @access  Public
-const getRotaWeekByDate = async (req, res, next) => {
-  try {
-    const inputDate = new Date(req.params.date);
-    const weekStart = getWeekStart(inputDate);
-
-    const rota = await RotaWeek.findOne({ weekStartDate: weekStart })
-      .populate('shifts.staffId', 'name email role hourlyRate')
-      .populate('shifts.shiftTemplateId', 'name requiredRole dayOfWeek');
-
-    if (!rota) {
-      return res.status(404).json({
-        success: false,
-        error: 'No rota found for this week'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: rota
-    });
-  } catch (error) {
-    next(error);
+const getRotaWeekByDate = asyncHandler(async (req, res) => {
+  const inputDate = new Date(req.params.date);
+  
+  if (isNaN(inputDate.getTime())) {
+    throw new ValidationError('Invalid date format. Please use YYYY-MM-DD.');
   }
-};
+
+  const weekStart = getWeekStart(inputDate);
+
+  const rota = await RotaWeek.findOne({ weekStartDate: weekStart })
+    .populate('shifts.staffId', 'name email role hourlyRate contractedHours')
+    .populate('shifts.shiftTemplateId', 'name requiredRole dayOfWeek startTime endTime')
+    .select('-__v');
+
+  if (!rota) {
+    throw new NotFoundError(`No rota found for week starting ${weekStart.toISOString().split('T')[0]}`);
+  }
+
+  // Add daily breakdown for better frontend consumption
+  const dailyBreakdown = generateDailyBreakdown(rota);
+
+  res.json({
+    success: true,
+    data: {
+      ...rota.toObject(),
+      dailyBreakdown
+    }
+  });
+});
 
 // @desc    Generate new rota week
 // @route   POST /api/rota/generate
 // @access  Public
 const generateRotaWeek = async (req, res, next) => {
   try {
-    const { weekStartDate } = req.body;
+    const { weekStartDate, debug = false } = req.body;
 
     if (!weekStartDate) {
       return res.status(400).json({
@@ -94,75 +134,126 @@ const generateRotaWeek = async (req, res, next) => {
       });
     }
 
-    const rota = await rotaGenerationService.generateWeeklyRota(new Date(weekStartDate));
+    // Enable debug logging if requested
+    const rotaGenerationService = require('../services/rotaGenerationService');
+    rotaGenerationService.debug = debug;
+
+    const result = await rotaGenerationService.generateWeeklyRota(new Date(weekStartDate));
 
     res.status(201).json({
       success: true,
-      data: rota,
-      message: 'Rota generated successfully'
+      data: result.rota,
+      analysis: result.analysis,
+      performance: result.performance,
+      message: `Rota generated successfully - ${result.performance.fillRate}% fill rate`
     });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Update rota week
+// @desc    Save manual edits to rota week
 // @route   PUT /api/rota/:id
 // @access  Public
-const updateRotaWeek = async (req, res, next) => {
-  try {
-    const rota = await RotaWeek.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      {
-        new: true,
-        runValidators: true
-      }
-    ).populate('shifts.staffId shifts.shiftTemplateId');
+const updateRotaWeek = asyncHandler(async (req, res) => {
+  const { shifts, notes, manualOverrides } = req.body;
+  
+  const rota = await RotaWeek.findById(req.params.id);
+  if (!rota) {
+    throw new NotFoundError('Rota not found');
+  }
 
-    if (!rota) {
-      return res.status(404).json({
-        success: false,
-        error: 'Rota not found'
-      });
-    }
+  // Prevent editing published rotas unless specifically allowed
+  if (rota.status === 'published' && !req.body.allowEditPublished) {
+    throw new ValidationError('Cannot edit published rota. Set allowEditPublished=true to override.');
+  }
 
-    res.json({
+  // Validate shift assignments if provided
+  if (shifts) {
+    await validateShiftAssignments(shifts);
+    rota.shifts = shifts;
+  }
+
+  // Update metadata
+  if (notes) rota.notes = notes;
+  if (manualOverrides) {
+    rota.manualOverrides = {
+      ...rota.manualOverrides,
+      ...manualOverrides,
+      lastEditedAt: new Date(),
+      lastEditedBy: req.user?.id || 'system' // Add user tracking if auth implemented
+    };
+  }
+
+  // Recalculate totals
+  await recalculateRotaTotals(rota);
+
+  // Save with validation
+  await rota.save();
+  await rota.populate('shifts.staffId shifts.shiftTemplateId');
+
+  res.json({
+    success: true,
+    data: rota,
+    message: 'Rota updated successfully'
+  });
+});
+
+// @desc    Publish rota week (make visible to staff)
+// @route   POST /api/rota/:id/publish
+// @access  Public
+const publishRotaWeek = asyncHandler(async (req, res) => {
+  const { notifyStaff = true, publishNotes } = req.body;
+  
+  const rota = await RotaWeek.findById(req.params.id)
+    .populate('shifts.staffId', 'name email phone')
+    .populate('shifts.shiftTemplateId');
+
+  if (!rota) {
+    throw new NotFoundError('Rota not found');
+  }
+
+  if (rota.status === 'published') {
+    return res.json({
       success: true,
+      message: 'Rota is already published',
       data: rota
     });
-  } catch (error) {
-    next(error);
   }
-};
 
-// @desc    Publish rota week
-// @route   PUT /api/rota/:id/publish
-// @access  Public
-const publishRotaWeek = async (req, res, next) => {
-  try {
-    const rota = await RotaWeek.findByIdAndUpdate(
-      req.params.id,
-      { status: 'published' },
-      { new: true }
-    ).populate('shifts.staffId shifts.shiftTemplateId');
-
-    if (!rota) {
-      return res.status(404).json({
-        success: false,
-        error: 'Rota not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: rota,
-      message: 'Rota published successfully'
+  // Validate rota before publishing
+  const validation = await validateRotaForPublishing(rota);
+  if (!validation.isValid) {
+    return res.status(400).json({
+      success: false,
+      error: 'Rota validation failed',
+      issues: validation.issues,
+      message: 'Please resolve issues before publishing'
     });
-  } catch (error) {
-    next(error);
   }
-};
+
+  // Update rota status and metadata
+  rota.status = 'published';
+  rota.publishedAt = new Date();
+  rota.publishedBy = req.user?.id || 'system';
+  if (publishNotes) rota.publishNotes = publishNotes;
+
+  await rota.save();
+
+  // Optional: Send notifications to staff
+  let notificationResults = null;
+  if (notifyStaff) {
+    notificationResults = await notifyStaffOfPublishedRota(rota);
+  }
+
+  res.json({
+    success: true,
+    data: rota,
+    message: 'Rota published successfully',
+    validation,
+    notifications: notificationResults
+  });
+});
 
 // @desc    Delete rota week
 // @route   DELETE /api/rota/:id
@@ -196,6 +287,474 @@ const deleteRotaWeek = async (req, res, next) => {
   }
 };
 
+// @desc    Export rota week as CSV
+// @route   GET /api/rota/:id/export/csv
+// @access  Public
+const exportRotaAsCSV = asyncHandler(async (req, res) => {
+  const { format = 'detailed' } = req.query;
+  
+  const rota = await RotaWeek.findById(req.params.id)
+    .populate('shifts.staffId', 'name email role hourlyRate')
+    .populate('shifts.shiftTemplateId', 'name requiredRole dayOfWeek');
+
+  if (!rota) {
+    throw new NotFoundError('Rota not found');
+  }
+
+  let csvData, filename;
+
+  if (format === 'summary') {
+    // Staff summary format
+    csvData = generateStaffSummaryCSV(rota);
+    filename = `rota-summary-${rota.weekStartDate.toISOString().split('T')[0]}.csv`;
+  } else {
+    // Detailed shift format
+    csvData = generateDetailedRotaCSV(rota);
+    filename = `rota-detailed-${rota.weekStartDate.toISOString().split('T')[0]}.csv`;
+  }
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(csvData);
+});
+
+// @desc    Get rota week statistics
+// @route   GET /api/rota/:id/stats
+// @access  Public
+const getRotaStats = asyncHandler(async (req, res) => {
+  const rota = await RotaWeek.findById(req.params.id)
+    .populate('shifts.staffId', 'name role hourlyRate contractedHours')
+    .populate('shifts.shiftTemplateId');
+
+  if (!rota) {
+    throw new NotFoundError('Rota not found');
+  }
+
+  const stats = calculateRotaStatistics(rota);
+
+  res.json({
+    success: true,
+    data: {
+      rotaId: rota._id,
+      weekStart: rota.weekStartDate,
+      status: rota.status,
+      statistics: stats
+    }
+  });
+});
+
+// @desc    Clone rota to another week
+// @route   POST /api/rota/:id/clone
+// @access  Public
+const cloneRota = asyncHandler(async (req, res) => {
+  const { targetWeekStart } = req.body;
+  
+  if (!targetWeekStart) {
+    throw new ValidationError('Target week start date is required');
+  }
+
+  const sourceRota = await RotaWeek.findById(req.params.id);
+  if (!sourceRota) {
+    throw new NotFoundError('Source rota not found');
+  }
+
+  const targetDate = getWeekStart(new Date(targetWeekStart));
+  
+  // Check if target week already has a rota
+  const existingRota = await RotaWeek.findOne({ weekStartDate: targetDate });
+  if (existingRota) {
+    throw new ValidationError('Rota already exists for target week');
+  }
+
+  // Clone the rota
+  const clonedRota = new RotaWeek({
+    weekStartDate: targetDate,
+    weekEndDate: new Date(targetDate.getTime() + 6 * 24 * 60 * 60 * 1000),
+    shifts: sourceRota.shifts.map(shift => ({
+      ...shift.toObject(),
+      _id: undefined,
+      date: new Date(targetDate.getTime() + 
+        (shift.date.getTime() - sourceRota.weekStartDate.getTime()))
+    })),
+    status: 'draft',
+    notes: `Cloned from week ${sourceRota.weekStartDate.toISOString().split('T')[0]}`,
+    totalStaffHours: sourceRota.totalStaffHours,
+    totalLaborCost: sourceRota.totalLaborCost
+  });
+
+  await clonedRota.save();
+  await clonedRota.populate('shifts.staffId shifts.shiftTemplateId');
+
+  res.status(201).json({
+    success: true,
+    data: clonedRota,
+    message: 'Rota cloned successfully'
+  });
+});
+
+/**
+ * Helper Methods
+ */
+
+// Generate daily breakdown for better frontend consumption
+const generateDailyBreakdown = (rota) => {
+  const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+  const breakdown = {};
+
+  days.forEach((day, index) => {
+    const dayDate = new Date(rota.weekStartDate.getTime() + index * 24 * 60 * 60 * 1000);
+    const dayShifts = rota.shifts.filter(shift => 
+      shift.date.toDateString() === dayDate.toDateString()
+    );
+
+    breakdown[day] = {
+      date: dayDate,
+      shifts: dayShifts.map(shift => ({
+        id: shift._id,
+        staff: shift.staffId,
+        template: shift.shiftTemplateId,
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        status: shift.status
+      })),
+      totalHours: dayShifts.reduce((sum, shift) => {
+        const { calculateShiftDuration } = require('../utils/dateUtils');
+        const duration = calculateShiftDuration(shift.startTime, shift.endTime);
+        return sum + duration;
+      }, 0),
+      staffCount: dayShifts.length
+    };
+  });
+
+  return breakdown;
+};
+
+// Validate shift assignments
+const validateShiftAssignments = async (shifts) => {
+  const issues = [];
+
+  for (const shift of shifts) {
+    // Validate staff exists and is active
+    if (shift.staffId) {
+      const staff = await Staff.findOne({ _id: shift.staffId, isActive: true });
+      if (!staff) {
+        issues.push(`Staff member ${shift.staffId} not found or inactive`);
+        continue;
+      }
+
+      // Check if staff is available on the day
+      const dayName = getDayName(shift.date).toLowerCase();
+      if (!staff.availableDays.includes(dayName)) {
+        issues.push(`${staff.name} is not available on ${dayName}`);
+      }
+    }
+  }
+
+  if (issues.length > 0) {
+    throw new ValidationError(`Shift validation failed: ${issues.join(', ')}`);
+  }
+};
+
+// Recalculate rota totals after manual edits
+const recalculateRotaTotals = async (rota) => {
+  let totalHours = 0;
+  let totalCost = 0;
+
+  for (const shift of rota.shifts) {
+    const duration = calculateShiftDuration(shift.startTime, shift.endTime);
+    totalHours += duration;
+
+    if (shift.staffId) {
+      const staff = await Staff.findById(shift.staffId);
+      if (staff) {
+        totalCost += duration * staff.hourlyRate;
+      }
+    }
+  }
+
+  rota.totalStaffHours = Math.round(totalHours * 100) / 100;
+  rota.totalLaborCost = Math.round(totalCost * 100) / 100;
+};
+
+// Validate rota before publishing
+const validateRotaForPublishing = async (rota) => {
+  const issues = [];
+  
+  // Check for unfilled critical shifts
+  const criticalUnfilledShifts = rota.shifts.filter(shift => 
+    !shift.staffId && shift.priority > 3
+  );
+  
+  if (criticalUnfilledShifts.length > 0) {
+    issues.push(`${criticalUnfilledShifts.length} critical shifts are unfilled`);
+  }
+
+  // Check for staff conflicts
+  const conflicts = detectShiftConflicts(rota.shifts);
+  if (conflicts.length > 0) {
+    issues.push(`${conflicts.length} shift conflicts detected`);
+  }
+
+  // Check for minimum staffing requirements
+  const understaffedDays = checkMinimumStaffing(rota);
+  if (understaffedDays.length > 0) {
+    issues.push(`Understaffed on: ${understaffedDays.join(', ')}`);
+  }
+
+  return {
+    isValid: issues.length === 0,
+    issues,
+    timestamp: new Date()
+  };
+};
+
+// Notify staff of published rota
+const notifyStaffOfPublishedRota = async (rota) => {
+  const notificationResults = {
+    sent: 0,
+    failed: 0,
+    staff: []
+  };
+
+  // Get unique staff from shifts
+  const staffInRota = new Set();
+  rota.shifts.forEach(shift => {
+    if (shift.staffId) {
+      staffInRota.add(shift.staffId._id.toString());
+    }
+  });
+
+  for (const staffId of staffInRota) {
+    const staff = rota.shifts.find(s => s.staffId._id.toString() === staffId)?.staffId;
+    if (staff && staff.email) {
+      try {
+        // Here you would integrate with email service
+        // await emailService.sendRotaNotification(staff.email, rota);
+        notificationResults.sent++;
+        notificationResults.staff.push({
+          name: staff.name,
+          email: staff.email,
+          status: 'sent'
+        });
+      } catch (error) {
+        notificationResults.failed++;
+        notificationResults.staff.push({
+          name: staff.name,
+          email: staff.email,
+          status: 'failed',
+          error: error.message
+        });
+      }
+    }
+  }
+
+  return notificationResults;
+};
+
+// Generate detailed CSV
+const generateDetailedRotaCSV = (rota) => {
+  const shifts = rota.shifts.map(shift => ({
+    Date: shift.date.toLocaleDateString(),
+    Day: getDayName(shift.date),
+    'Staff Name': shift.staffId?.name || 'Unassigned',
+    Role: shift.staffId?.role || '',
+    'Shift Template': shift.shiftTemplateId?.name || '',
+    'Start Time': shift.startTime,
+    'End Time': shift.endTime,
+    'Duration (hours)': calculateShiftDuration(shift.startTime, shift.endTime),
+    'Hourly Rate': shift.staffId?.hourlyRate || 0,
+    'Shift Cost': shift.staffId ? 
+      (calculateShiftDuration(shift.startTime, shift.endTime) * shift.staffId.hourlyRate).toFixed(2) : 0,
+    Status: shift.status,
+    Email: shift.staffId?.email || ''
+  }));
+
+  const parser = new Parser();
+  return parser.parse(shifts);
+};
+
+// Generate staff summary CSV
+const generateStaffSummaryCSV = (rota) => {
+  const staffSummary = {};
+
+  // Group shifts by staff
+  rota.shifts.forEach(shift => {
+    if (!shift.staffId) return;
+    
+    const staffId = shift.staffId._id.toString();
+    if (!staffSummary[staffId]) {
+      staffSummary[staffId] = {
+        'Staff Name': shift.staffId.name,
+        Role: shift.staffId.role,
+        'Hourly Rate': shift.staffId.hourlyRate,
+        'Total Hours': 0,
+        'Total Cost': 0,
+        'Shift Count': 0,
+        Email: shift.staffId.email
+      };
+    }
+
+    const duration = calculateShiftDuration(shift.startTime, shift.endTime);
+    staffSummary[staffId]['Total Hours'] += duration;
+    staffSummary[staffId]['Total Cost'] += duration * shift.staffId.hourlyRate;
+    staffSummary[staffId]['Shift Count']++;
+  });
+
+  const summaryArray = Object.values(staffSummary).map(summary => ({
+    ...summary,
+    'Total Hours': summary['Total Hours'].toFixed(1),
+    'Total Cost': summary['Total Cost'].toFixed(2)
+  }));
+
+  const parser = new Parser();
+  return parser.parse(summaryArray);
+};
+
+// Calculate comprehensive rota statistics
+const calculateRotaStatistics = (rota) => {
+  const stats = {
+    overview: {
+      totalShifts: rota.shifts.length,
+      filledShifts: rota.shifts.filter(s => s.staffId).length,
+      unfilledShifts: rota.shifts.filter(s => !s.staffId).length,
+      totalHours: rota.totalStaffHours,
+      totalCost: rota.totalLaborCost,
+      averageCostPerHour: rota.totalStaffHours > 0 ? (rota.totalLaborCost / rota.totalStaffHours).toFixed(2) : 0
+    },
+    byRole: {},
+    byDay: {},
+    staffUtilization: {}
+  };
+
+  // Calculate by role
+  rota.shifts.forEach(shift => {
+    if (shift.staffId) {
+      const role = shift.staffId.role;
+      if (!stats.byRole[role]) {
+        stats.byRole[role] = { count: 0, hours: 0, cost: 0 };
+      }
+      
+      const duration = calculateShiftDuration(shift.startTime, shift.endTime);
+      stats.byRole[role].count++;
+      stats.byRole[role].hours += duration;
+      stats.byRole[role].cost += duration * shift.staffId.hourlyRate;
+    }
+  });
+
+  // Calculate by day
+  const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+  days.forEach((day, index) => {
+    const dayDate = new Date(rota.weekStartDate.getTime() + index * 24 * 60 * 60 * 1000);
+    const dayShifts = rota.shifts.filter(shift => 
+      shift.date.toDateString() === dayDate.toDateString()
+    );
+    
+    stats.byDay[day] = {
+      shifts: dayShifts.length,
+      filledShifts: dayShifts.filter(s => s.staffId).length,
+      hours: dayShifts.reduce((sum, shift) => {
+        return sum + calculateShiftDuration(shift.startTime, shift.endTime);
+      }, 0)
+    };
+  });
+
+  // Calculate staff utilization
+  const staffHours = {};
+  rota.shifts.forEach(shift => {
+    if (shift.staffId) {
+      const staffId = shift.staffId._id.toString();
+      if (!staffHours[staffId]) {
+        staffHours[staffId] = {
+          name: shift.staffId.name,
+          hours: 0,
+          shifts: 0,
+          contractedHours: shift.staffId.contractedHours || 0
+        };
+      }
+      
+      staffHours[staffId].hours += calculateShiftDuration(shift.startTime, shift.endTime);
+      staffHours[staffId].shifts++;
+    }
+  });
+
+  stats.staffUtilization = Object.values(staffHours).map(staff => ({
+    ...staff,
+    utilizationRate: staff.contractedHours > 0 ? 
+      ((staff.hours / staff.contractedHours) * 100).toFixed(1) : 'N/A'
+  }));
+
+  return stats;
+};
+
+// Detect shift conflicts
+const detectShiftConflicts = (shifts) => {
+  const conflicts = [];
+  const sortedShifts = [...shifts].sort((a, b) => 
+    a.date.getTime() - b.date.getTime() || 
+    timeToMinutes(a.startTime) - timeToMinutes(b.startTime)
+  );
+
+  for (let i = 0; i < sortedShifts.length - 1; i++) {
+    for (let j = i + 1; j < sortedShifts.length; j++) {
+      const shift1 = sortedShifts[i];
+      const shift2 = sortedShifts[j];
+
+      if (shift1.staffId && shift2.staffId && 
+          shift1.staffId.toString() === shift2.staffId.toString() &&
+          shift1.date.toDateString() === shift2.date.toDateString()) {
+        
+        if (shiftsOverlap(shift1.startTime, shift1.endTime, shift2.startTime, shift2.endTime)) {
+          conflicts.push({ shift1: shift1._id, shift2: shift2._id });
+        }
+      }
+    }
+  }
+
+  return conflicts;
+};
+
+// Check minimum staffing requirements
+const checkMinimumStaffing = (rota) => {
+  const understaffedDays = [];
+  const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+  
+  days.forEach((day, index) => {
+    const dayDate = new Date(rota.weekStartDate.getTime() + index * 24 * 60 * 60 * 1000);
+    const dayShifts = rota.shifts.filter(shift => 
+      shift.date.toDateString() === dayDate.toDateString() && shift.staffId
+    );
+    
+    // Basic check: ensure at least 1 person scheduled per day
+    // You could make this more sophisticated based on business requirements
+    if (dayShifts.length === 0) {
+      understaffedDays.push(day);
+    }
+  });
+
+  return understaffedDays;
+};
+
+// Calculate shift duration helper
+function calculateShiftDuration(startTime, endTime) {
+  const { calculateShiftDuration: utilCalculateShiftDuration } = require('../utils/dateUtils');
+  return utilCalculateShiftDuration(startTime, endTime);
+}
+
+// Utility methods
+const timeToMinutes = (timeStr) => {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
+const shiftsOverlap = (start1, end1, start2, end2) => {
+  const start1Minutes = timeToMinutes(start1);
+  const end1Minutes = timeToMinutes(end1);
+  const start2Minutes = timeToMinutes(start2);
+  const end2Minutes = timeToMinutes(end2);
+
+  return start1Minutes < end2Minutes && start2Minutes < end1Minutes;
+};
+
 module.exports = {
   getAllRotaWeeks,
   getRotaWeekById,
@@ -203,5 +762,8 @@ module.exports = {
   generateRotaWeek,
   updateRotaWeek,
   publishRotaWeek,
-  deleteRotaWeek
+  deleteRotaWeek,
+  exportRotaAsCSV,
+  getRotaStats,
+  cloneRota
 };
