@@ -1,0 +1,14 @@
+.App {
+  text-align: center;
+}
+
+.app-content {
+  padding: 20px;
+  min-height: calc(100vh - 120px); /* Adjust based on header/footer height */
+}
+
+@media (max-width: 768px) {
+  .app-content {
+    padding: 10px;
+  }
+}
