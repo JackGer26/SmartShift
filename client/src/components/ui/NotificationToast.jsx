@@ -46,11 +46,15 @@ const NotificationToast = () => {
             <div className="notification-icon">
               {getNotificationIcon(notification.type)}
             </div>
-            <div className="notification-text">
+            <div className="notification-text" style={{ color: '#000000' }}>
               {notification.title && (
-                <div className="notification-title">{notification.title}</div>
+                <div className="notification-title" style={{ color: '#000000', fontWeight: 600, fontSize: '14px' }}>
+                  {notification.title}
+                </div>
               )}
-              <div className="notification-message">{notification.message}</div>
+              <div className="notification-message" style={{ color: '#000000', fontSize: '13px' }}>
+                {notification.message}
+              </div>
             </div>
             <button
               className="notification-close"

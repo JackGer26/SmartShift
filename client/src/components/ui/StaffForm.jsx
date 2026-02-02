@@ -21,9 +21,17 @@ const StaffForm = ({ staff = null, onSubmit, onCancel, isLoading = false }) => {
 
   const roles = [
     { value: 'manager', label: 'Manager' },
+    { value: 'assistant_manager', label: 'Assistant Manager' },
+    { value: 'head_chef', label: 'Head Chef' },
     { value: 'chef', label: 'Chef' },
+    { value: 'kitchen_assistant', label: 'Kitchen Assistant' },
+    { value: 'head_waiter', label: 'Head Waiter' },
     { value: 'waiter', label: 'Waiter' },
+    { value: 'head_bartender', label: 'Head Bartender' },
     { value: 'bartender', label: 'Bartender' },
+    { value: 'hostess', label: 'Hostess' },
+    { value: 'delivery_driver', label: 'Delivery Driver' },
+    { value: 'trainee', label: 'Trainee' },
     { value: 'cleaner', label: 'Cleaner' }
   ];
 

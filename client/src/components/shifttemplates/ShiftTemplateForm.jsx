@@ -45,11 +45,19 @@ const ShiftTemplateForm = ({
   ];
 
   const roles = [
-    { value: 'manager', label: '👔 Manager', color: '#8e44ad' },
-    { value: 'chef', label: '👨‍🍳 Chef', color: '#e74c3c' },
-    { value: 'waiter', label: '🍽️ Waiter', color: '#3498db' },
-    { value: 'bartender', label: '🍺 Bartender', color: '#f39c12' },
-    { value: 'cleaner', label: '🧹 Cleaner', color: '#27ae60' }
+    { value: 'manager', label: '👔 Manager', color: '#1976d2' },
+    { value: 'assistant_manager', label: '👔 Assistant Manager', color: '#3f51b5' },
+    { value: 'head_chef', label: '👨‍🍳 Head Chef', color: '#ad1457' },
+    { value: 'chef', label: '👨‍🍳 Chef', color: '#c62828' },
+    { value: 'kitchen_assistant', label: '🥄 Kitchen Assistant', color: '#f57c00' },
+    { value: 'head_waiter', label: '🍽️ Head Waiter', color: '#00695c' },
+    { value: 'waiter', label: '🍽️ Waiter', color: '#1565c0' },
+    { value: 'head_bartender', label: '🍺 Head Bartender', color: '#7b1fa2' },
+    { value: 'bartender', label: '🍺 Bartender', color: '#ef6c00' },
+    { value: 'hostess', label: '👋 Hostess', color: '#c2185b' },
+    { value: 'delivery_driver', label: '🚗 Delivery Driver', color: '#2e7d32' },
+    { value: 'trainee', label: '🎓 Trainee', color: '#e65100' },
+    { value: 'cleaner', label: '🧹 Cleaner', color: '#33691e' }
   ];
 
   const priorityLevels = [

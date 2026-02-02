@@ -18,7 +18,6 @@ const staffSchema = new mongoose.Schema({
   email: {
     type: String,
     required: [true, 'Email address is required'],
-    unique: true,
     trim: true,
     lowercase: true,
     validate: {
@@ -166,7 +165,11 @@ const staffSchema = new mongoose.Schema({
 });
 
 // Database indexes for performance
-staffSchema.index({ email: 1 }, { unique: true });
+// Partial unique index - email uniqueness only applies to active staff
+staffSchema.index({ email: 1 }, { 
+  unique: true, 
+  partialFilterExpression: { isActive: true }
+});
 staffSchema.index({ role: 1 });
 staffSchema.index({ isActive: 1 });
 staffSchema.index({ role: 1, isActive: 1 }); // Compound index for active staff by role

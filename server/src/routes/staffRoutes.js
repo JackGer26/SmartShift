@@ -4,7 +4,8 @@ const {
   getStaffById,
   createStaff,
   updateStaff,
-  deleteStaff
+  deleteStaff,
+  cleanupStaffRoles
 } = require('../controllers/staffController');
 const { validateStaff, validateObjectId } = require('../utils/validation');
 
@@ -31,5 +32,8 @@ router.put('/:id', validateObjectId, validateStaff, updateStaff);
 
 // DELETE /api/staff/:id - Soft delete staff member (set isActive = false)
 router.delete('/:id', validateObjectId, deleteStaff);
+
+// POST /api/staff/cleanup-roles - Cleanup and standardize staff roles
+router.post('/cleanup-roles', cleanupStaffRoles);
 
 module.exports = router;

@@ -255,9 +255,21 @@
 }
 
 .role-manager {
-  background-color: #f3e5f5;
-  color: #8e24aa;
-  border: 1px solid #ce93d8;
+  background-color: #e3f2fd;
+  color: #1976d2;
+  border: 1px solid #90caf9;
+}
+
+.role-assistant_manager {
+  background-color: #e8eaf6;
+  color: #3f51b5;
+  border: 1px solid #9fa8da;
+}
+
+.role-head_chef {
+  background-color: #fce4ec;
+  color: #ad1457;
+  border: 1px solid #f48fb1;
 }
 
 .role-chef {
@@ -266,16 +278,58 @@
   border: 1px solid #ef9a9a;
 }
 
+.role-kitchen_assistant {
+  background-color: #fff3e0;
+  color: #f57c00;
+  border: 1px solid #ffcc80;
+}
+
+.role-head_waiter {
+  background-color: #e0f2f1;
+  color: #00695c;
+  border: 1px solid #80cbc4;
+}
+
 .role-waiter {
   background-color: #e3f2fd;
   color: #1565c0;
   border: 1px solid #90caf9;
 }
 
+.role-head_bartender {
+  background-color: #f3e5f5;
+  color: #7b1fa2;
+  border: 1px solid #ce93d8;
+}
+
 .role-bartender {
   background-color: #fff8e1;
   color: #ef6c00;
   border: 1px solid #ffcc02;
+}
+
+.role-hostess {
+  background-color: #fce4ec;
+  color: #c2185b;
+  border: 1px solid #f8bbd9;
+}
+
+.role-delivery_driver {
+  background-color: #e8f5e8;
+  color: #2e7d32;
+  border: 1px solid #a5d6a7;
+}
+
+.role-trainee {
+  background-color: #fff3e0;
+  color: #e65100;
+  border: 1px solid #ffb74d;
+}
+
+.role-cleaner {
+  background-color: #f1f8e9;
+  color: #33691e;
+  border: 1px solid #c5e1a5;
 }
 
 .role-cleaner {

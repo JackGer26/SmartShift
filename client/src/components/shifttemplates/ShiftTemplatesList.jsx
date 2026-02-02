@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { deleteShiftTemplate, toggleTemplateStatus, duplicateTemplate } from '../../api/shiftTemplateAPI';
+import { formatRoleForDisplay } from '../../utils/roleUtils';
+import { STAFF_ROLES } from '../../utils/constants';
 import './ShiftTemplatesList.css';
 
 /**
@@ -25,7 +27,7 @@ const ShiftTemplatesList = ({
   const [showInactive, setShowInactive] = useState(false);
 
   const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-  const roles = ['manager', 'chef', 'waiter', 'bartender', 'cleaner'];
+  const roles = STAFF_ROLES;
 
   // Filter templates
   const filteredTemplates = templates.filter(template => {
@@ -104,9 +106,17 @@ const ShiftTemplatesList = ({
   const getRoleBadge = (role) => {
     const badges = {
       manager: 'role-badge role-manager',
+      assistant_manager: 'role-badge role-assistant_manager',
+      head_chef: 'role-badge role-head_chef',
       chef: 'role-badge role-chef',
+      kitchen_assistant: 'role-badge role-kitchen_assistant',
+      head_waiter: 'role-badge role-head_waiter',
       waiter: 'role-badge role-waiter',
+      head_bartender: 'role-badge role-head_bartender',
       bartender: 'role-badge role-bartender',
+      hostess: 'role-badge role-hostess',
+      delivery_driver: 'role-badge role-delivery_driver',
+      trainee: 'role-badge role-trainee',
       cleaner: 'role-badge role-cleaner'
     };
     return badges[role] || 'role-badge';
@@ -147,7 +157,7 @@ const ShiftTemplatesList = ({
             <option value="all">All Roles</option>
             {roles.map(role => (
               <option key={role} value={role}>
-                {role.charAt(0).toUpperCase() + role.slice(1)}
+                {formatRoleForDisplay(role)}
               </option>
             ))}
           </select>
@@ -219,7 +229,7 @@ const ShiftTemplatesList = ({
                     
                     <div className="template-details">
                       <span className={getRoleBadge(template.requiredRole)}>
-                        {template.requiredRole}
+                        {formatRoleForDisplay(template.requiredRole)}
                       </span>
                       <span className="staff-count">{template.staffCount} staff</span>
                     </div>

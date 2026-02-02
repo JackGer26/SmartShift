@@ -3,6 +3,8 @@ import { staffAPI } from '../api/staffAPI';
 import { Modal, ConfirmDialog, Toast } from '../components/ui/Modal';
 import StaffForm from '../components/ui/StaffForm';
 import { LoadingSpinner, ErrorMessage } from '../components/ui/UIComponents';
+import { formatRoleForDisplay } from '../utils/roleUtils';
+import { STAFF_ROLES } from '../utils/constants';
 
 /**
  * StaffPage - Comprehensive staff management with CRUD operations
@@ -52,11 +54,15 @@ const StaffPage = () => {
     try {
       setLoading(true);
       setError(null);
+      console.log('Attempting to load staff from API...');
       const data = await staffAPI.getAll();
+      console.log('Staff data loaded successfully:', data);
       setStaff(data);
     } catch (err) {
-      setError('Failed to load staff members');
-      console.error('Error loading staff:', err);
+      console.error('Error loading staff - Full error:', err);
+      console.error('Error message:', err.message);
+      console.error('Error status:', err.status);
+      setError(`Failed to load staff members: ${err.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -196,11 +202,11 @@ const StaffPage = () => {
               onChange={(e) => setRoleFilter(e.target.value)}
             >
               <option value="all">All Roles</option>
-              <option value="manager">Manager</option>
-              <option value="chef">Chef</option>
-              <option value="waiter">Waiter</option>
-              <option value="bartender">Bartender</option>
-              <option value="cleaner">Cleaner</option>
+              {STAFF_ROLES.map(role => (
+                <option key={role} value={role}>
+                  {formatRoleForDisplay(role)}
+                </option>
+              ))}
             </select>
             <span className="results-count">
               {filteredStaff.length} of {staff.length} staff members
@@ -316,7 +322,7 @@ const StaffPage = () => {
                     </td>
                     <td>
                       <span className={`role-badge role-${member.role}`}>
-                        {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                        {formatRoleForDisplay(member.role)}
                       </span>
                     </td>
                     <td>
@@ -415,16 +421,63 @@ const StaffPage = () => {
         
         .search-input {
           min-width: 300px;
+          padding: 12px 16px;
+          font-size: 14px;
+          line-height: 1.4;
+          height: auto;
+          background-color: #ffffff;
+          color: #374151;
+          border: 2px solid #e5e7eb;
+          border-radius: 8px;
+        }
+        
+        .search-input:focus {
+          outline: none;
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .search-input::placeholder {
+          color: #9ca3af;
+          font-size: 14px;
         }
         
         .filter-controls {
           display: flex;
           align-items: center;
           gap: 15px;
+          flex-shrink: 0;
         }
         
         .filter-select {
           min-width: 150px;
+          padding: 12px 16px;
+          font-size: 14px;
+          line-height: 1.4;
+          height: auto;
+          background-color: #ffffff;
+          color: #374151;
+          border: 2px solid #e5e7eb;
+          border-radius: 8px;
+          cursor: pointer;
+          appearance: none;
+          background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23374151' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+          background-repeat: no-repeat;
+          background-position: right 12px center;
+          background-size: 16px;
+          padding-right: 44px;
+        }
+        
+        .filter-select:focus {
+          outline: none;
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .filter-select option {
+          color: #374151;
+          background-color: #ffffff;
+          padding: 8px;
         }
         
         .results-count {
@@ -514,10 +567,18 @@ const StaffPage = () => {
         }
         
         .role-manager { background-color: #e3f2fd; color: #1976d2; }
+        .role-assistant_manager { background-color: #e8eaf6; color: #3f51b5; }
+        .role-head_chef { background-color: #fff8e1; color: #f57f17; }
         .role-chef { background-color: #fff3e0; color: #f57c00; }
-        .role-waiter { background-color: #f3e5f5; color: #7b1fa2; }
-        .role-bartender { background-color: #e8f5e8; color: #388e3c; }
-        .role-cleaner { background-color: #fce4ec; color: #c2185b; }
+        .role-kitchen_assistant { background-color: #fef7ff; color: #8e24aa; }
+        .role-head_waiter { background-color: #f3e5f5; color: #7b1fa2; }
+        .role-waiter { background-color: #f8bbd9; color: #ad1457; }
+        .role-head_bartender { background-color: #e8f5e8; color: #2e7d32; }
+        .role-bartender { background-color: #f1f8e9; color: #558b2f; }
+        .role-hostess { background-color: #fce4ec; color: #c2185b; }
+        .role-delivery_driver { background-color: #e3f2fd; color: #1565c0; }
+        .role-trainee { background-color: #fff3e0; color: #ef6c00; }
+        .role-cleaner { background-color: #f3e5f5; color: #7b1fa2; }
         
         .hourly-rate {
           font-weight: 500;

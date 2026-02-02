@@ -27,8 +27,14 @@ const getAllStaff = asyncHandler(async (req, res) => {
   // Build filter object
   const filter = {};
   
+  // Default to only active staff unless explicitly requesting inactive ones
+  if (isActive === undefined) {
+    filter.isActive = true;
+  } else {
+    filter.isActive = isActive === 'true';
+  }
+  
   if (role) filter.role = role;
-  if (isActive !== undefined) filter.isActive = isActive === 'true';
   if (availableOn) filter.availableDays = { $in: [availableOn.toLowerCase()] };
   
   // Search across name and email
@@ -85,8 +91,11 @@ const getStaffById = asyncHandler(async (req, res) => {
 // @route   POST /api/staff
 // @access  Public
 const createStaff = asyncHandler(async (req, res) => {
-  // Check for duplicate email
-  const existingStaff = await Staff.findOne({ email: req.body.email });
+  // Check for duplicate email among active staff only
+  const existingStaff = await Staff.findOne({ 
+    email: req.body.email, 
+    isActive: true 
+  });
   if (existingStaff) {
     throw new ValidationError('Email address already in use by another staff member');
   }
@@ -112,7 +121,11 @@ const updateStaff = asyncHandler(async (req, res) => {
 
   // Check for duplicate email if email is being changed
   if (req.body.email && req.body.email !== staff.email) {
-    const existingStaff = await Staff.findOne({ email: req.body.email });
+    const existingStaff = await Staff.findOne({ 
+      email: req.body.email,
+      isActive: true,
+      _id: { $ne: req.params.id } 
+    });
     if (existingStaff) {
       throw new ValidationError('Email address already in use by another staff member');
     }
@@ -156,10 +169,108 @@ const deleteStaff = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Cleanup and standardize all staff roles
+// @route   POST /api/staff/cleanup-roles
+// @access  Public
+const cleanupStaffRoles = asyncHandler(async (req, res) => {
+  const { STAFF_ROLES } = require('../models/constants');
+  
+  // Role mapping for common variations
+  const roleMapping = {
+    'head chef': 'head_chef',
+    'headchef': 'head_chef',
+    'sous chef': 'chef',
+    'souschef': 'chef',
+    'cook': 'chef',
+    'kitchen staff': 'kitchen_assistant',
+    'server': 'waiter',
+    'waitress': 'waiter',
+    'waiter/waitress': 'waiter',
+    'head waiter': 'head_waiter',
+    'headwaiter': 'head_waiter',
+    'senior waiter': 'head_waiter',
+    'bar staff': 'bartender',
+    'barman': 'bartender',
+    'barmaid': 'bartender',
+    'head bartender': 'head_bartender',
+    'headbartender': 'head_bartender',
+    'senior bartender': 'head_bartender',
+    'host': 'hostess',
+    'hostess/host': 'hostess',
+    'driver': 'delivery_driver',
+    'delivery': 'delivery_driver',
+    'cleaning': 'cleaner',
+    'cleaning staff': 'cleaner',
+    'janitor': 'cleaner',
+    'dishwasher': 'kitchen_assistant',
+    'prep cook': 'kitchen_assistant',
+    'trainee staff': 'trainee',
+    'apprentice': 'trainee',
+    'intern': 'trainee'
+  };
+
+  // Get all active staff
+  const allStaff = await Staff.find({ isActive: true });
+  
+  let updatedCount = 0;
+  const updates = [];
+  const errors = [];
+
+  for (const staff of allStaff) {
+    const currentRole = staff.role.toLowerCase().trim();
+    let newRole = staff.role;
+
+    // Check if role needs mapping
+    if (roleMapping[currentRole]) {
+      newRole = roleMapping[currentRole];
+    }
+    // Check if role is invalid and needs default assignment
+    else if (!STAFF_ROLES.includes(staff.role)) {
+      newRole = 'waiter'; // Default role for unknown roles
+    }
+
+    // Update if different
+    if (newRole !== staff.role) {
+      try {
+        const oldRole = staff.role;
+        staff.role = newRole;
+        await staff.save();
+        
+        updatedCount++;
+        updates.push({
+          staffId: staff._id,
+          name: staff.name,
+          oldRole: oldRole,
+          newRole: newRole
+        });
+      } catch (error) {
+        errors.push({
+          staffId: staff._id,
+          name: staff.name,
+          error: error.message
+        });
+      }
+    }
+  }
+
+  res.json({
+    success: true,
+    message: `Role cleanup completed. Updated ${updatedCount} staff members.`,
+    data: {
+      updatedCount,
+      totalStaff: allStaff.length,
+      updates,
+      errors,
+      validRoles: STAFF_ROLES
+    }
+  });
+});
+
 module.exports = {
   getAllStaff,
   getStaffById,
   createStaff,
   updateStaff,
-  deleteStaff
+  deleteStaff,
+  cleanupStaffRoles
 };

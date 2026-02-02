@@ -50,6 +50,9 @@
   border: 2px solid #dee2e6;
   border-radius: 8px;
   font-size: 14px;
+  color: #374151;
+  caret-color: #374151;
+  cursor: text;
   font-family: inherit;
   transition: all 0.2s ease;
   background-color: white;

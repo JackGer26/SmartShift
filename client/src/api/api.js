@@ -28,19 +28,28 @@ export const apiRequest = async (endpoint, options = {}) => {
   };
 
   try {
+    console.log('Making API request to:', url);
     const response = await fetch(url, config);
+    console.log('Response received:', response.status, response.statusText);
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      const error = new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      error.status = response.status;
+      throw error;
     }
 
     const data = await response.json();
+    console.log('API Response data:', data);
     
     // Return the data array if it's a successful response with data property
     return data.success ? data.data : data;
   } catch (error) {
-    console.error('API Request failed:', error);
+    console.error('API Request failed for URL:', url);
+    console.error('Error details:', error);
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      error.message = 'Unable to connect to the server. Please check if the backend is running on port 5000.';
+    }
     throw error;
   }
 };

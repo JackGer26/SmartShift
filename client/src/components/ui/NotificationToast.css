@@ -43,17 +43,45 @@
   min-width: 0;
 }
 
+/* Ensure text visibility in all contexts */
+.notification-text * {
+  color: #2c3e50 !important;
+}
+
+.notification-toast .notification-title {
+  color: #2c3e50 !important;
+  text-shadow: none !important;
+}
+
+.notification-toast .notification-message {
+  color: #2c3e50 !important;
+  text-shadow: none !important;
+}
+
+/* Force dark text in all notification contexts */
+.notification-container * {
+  color: #2c3e50 !important;
+}
+
+.notification-toast * {
+  color: #2c3e50 !important;
+}
+
+.notification-content * {
+  color: #2c3e50 !important;
+}
+
 .notification-title {
   font-weight: 600;
   font-size: 14px;
-  color: #2c3e50;
+  color: #2c3e50 !important;
   margin-bottom: 4px;
   line-height: 1.2;
 }
 
 .notification-message {
   font-size: 13px;
-  color: #5a6c7d;
+  color: #5a6c7d !important;
   line-height: 1.4;
   word-wrap: break-word;
 }
@@ -222,4 +250,67 @@
     animation: none;
     background: linear-gradient(to right, transparent 0%, transparent 100%);
   }
+}
+
+/* ULTIMATE TEXT VISIBILITY FIX - Override all possible white text sources */
+.notification-toast, 
+.notification-toast *, 
+.notification-container,
+.notification-container *,
+.notification-content,
+.notification-content *,
+div[class*="notification"],
+div[class*="notification"] *,
+span[class*="notification"],
+span[class*="notification"] * {
+  color: #000000 !important;
+  text-shadow: none !important;
+  -webkit-text-fill-color: #000000 !important;
+}
+
+/* Specific element targeting with maximum specificity */
+.notification-toast .notification-title,
+.notification-container .notification-title {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+}
+
+.notification-toast .notification-message,
+.notification-container .notification-message {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+}
+
+/* Nuclear option - force styling with inline-style level specificity */
+div.notification-toast div.notification-content div.notification-text div.notification-title {
+  color: #000000 !important;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+  line-height: 1.2;
+}
+
+div.notification-toast div.notification-content div.notification-text div.notification-message {
+  color: #000000 !important;
+  font-size: 13px;
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+
+/* Alternative approach - use CSS custom properties */
+.notification-container {
+  --text-color: #000000;
+}
+
+.notification-toast * {
+  color: var(--text-color) !important;
+}
+
+/* Inline style override simulation */
+[role="alert"] .notification-title {
+  color: #000000 !important;
+}
+
+[role="alert"] .notification-message {
+  color: #000000 !important;
 }
