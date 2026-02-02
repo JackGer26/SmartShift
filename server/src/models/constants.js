@@ -8,9 +8,17 @@
 // Restaurant staff roles - core job positions
 const STAFF_ROLES = [
   'manager',
-  'chef', 
+  'assistant_manager',
+  'head_chef',
+  'chef',
+  'kitchen_assistant',
+  'head_waiter',
   'waiter',
+  'head_bartender',
   'bartender',
+  'hostess',
+  'delivery_driver',
+  'trainee',
   'cleaner'
 ];
 
@@ -27,10 +35,11 @@ const DAYS_OF_WEEK = [
 
 // Time off request types
 const TIME_OFF_TYPES = [
-  'holiday',    // Planned vacation time
-  'sick',       // Illness/medical leave
-  'personal',   // Personal matters
-  'other'       // Other reasons
+  'holiday',           // Planned vacation time
+  'sick',              // Illness/medical leave
+  'personal',          // Personal matters
+  'family_emergency',  // Family emergency
+  'other'              // Other reasons
 ];
 
 // Time off request statuses
@@ -71,7 +80,7 @@ const CONSTRAINTS = {
 // Regular expressions for validation
 const PATTERNS = {
   TIME_24H: /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, // HH:MM format
-  UK_PHONE: /^(\+44|0)[1-9]\d{8,9}$/,            // UK phone format
+  UK_PHONE: /^(\+44\s?7\d{3}\s?\d{6}|0[1-9]\d{8,9})$/,  // UK mobile/landline
   EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/              // Basic email format
 };
 
