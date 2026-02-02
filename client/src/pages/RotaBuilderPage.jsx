@@ -11,10 +11,10 @@ import {
   getISODateString
 } from '../api/rotaBuilderAPI';
 import { getAllStaff } from '../api/staffAPI';
-import WeekPicker from '../components/ui/WeekPicker';
-import RotaGrid from '../components/ui/RotaGrid';
+import WeekPicker from '../components/rotabuilder/WeekPicker';
+import RotaGrid from '../components/rotabuilder/RotaGrid';
 import WarningsPanel from '../components/ui/WarningsPanel';
-import StaffHoursSummary from '../components/ui/StaffHoursSummary';
+import StaffHoursSummary from '../components/rotabuilder/StaffHoursSummary';
 
 /**
  * RotaBuilderPage - THE CORE ROTA BUILDING INTERFACE
