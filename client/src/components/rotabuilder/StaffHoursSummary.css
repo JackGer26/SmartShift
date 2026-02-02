@@ -1,0 +1,613 @@
+/* StaffHoursSummary - Staff hours tracking and visualization */
+.staff-hours-summary {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.staff-hours-summary.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #6c757d;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Summary header */
+.summary-header {
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  color: white;
+  padding: 20px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.header-title h3 {
+  margin: 0 0 4px 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.header-title p {
+  margin: 0;
+  opacity: 0.9;
+  font-size: 14px;
+}
+
+.header-stats {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.stat-item {
+  text-align: center;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px 16px;
+  min-width: 80px;
+}
+
+.stat-item.overtime {
+  background: rgba(255, 193, 7, 0.2);
+}
+
+.stat-value {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  display: block;
+  font-size: 11px;
+  opacity: 0.9;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Summary controls */
+.summary-controls {
+  background: #f8f9fa;
+  padding: 16px 24px;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  border-bottom: 1px solid #e9ecef;
+  flex-wrap: wrap;
+}
+
+.sort-controls,
+.filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sort-controls label,
+.filter-controls label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #495057;
+  white-space: nowrap;
+}
+
+.control-select {
+  padding: 6px 12px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 13px;
+  background: white;
+  cursor: pointer;
+}
+
+.control-select:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+/* Hours list */
+.hours-list {
+  padding: 20px 24px;
+}
+
+.no-staff {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.empty-state {
+  color: #6c757d;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-state h4 {
+  color: #495057;
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Staff hours items */
+.staff-hours-item {
+  display: grid;
+  grid-template-columns: 1fr 2fr 120px;
+  gap: 20px;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid #f8f9fa;
+  transition: all 0.2s ease;
+}
+
+.staff-hours-item:last-child {
+  border-bottom: none;
+}
+
+.staff-hours-item.clickable {
+  cursor: pointer;
+  border-radius: 8px;
+  margin: 0 -16px;
+  padding: 16px;
+}
+
+.staff-hours-item.clickable:hover {
+  background: #f8f9fa;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Status-based styling */
+.staff-hours-item.overtime {
+  border-left: 4px solid #dc3545;
+  background: linear-gradient(135deg, #ffffff, #fdf2f2);
+}
+
+.staff-hours-item.normal {
+  border-left: 4px solid #28a745;
+  background: linear-gradient(135deg, #ffffff, #f8fff9);
+}
+
+.staff-hours-item.undertime {
+  border-left: 4px solid #ffc107;
+  background: linear-gradient(135deg, #ffffff, #fffbf0);
+}
+
+.staff-hours-item.unassigned {
+  border-left: 4px solid #6c757d;
+  background: linear-gradient(135deg, #ffffff, #f8f9fa);
+  opacity: 0.7;
+}
+
+/* Staff info */
+.staff-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.staff-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.staff-details {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.staff-roles {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.role-tag {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: #e9ecef;
+  color: #495057;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.shift-count {
+  font-size: 12px;
+  color: #6c757d;
+  background: #f8f9fa;
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
+}
+
+/* Hours visualization */
+.hours-visualization {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hours-bar-container {
+  position: relative;
+  width: 100%;
+}
+
+.hours-bar-background {
+  position: relative;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  height: 20px;
+  overflow: hidden;
+}
+
+.hours-bar {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.hours-bar.regular {
+  background: linear-gradient(135deg, #28a745, #20c997);
+  left: 0;
+}
+
+.hours-bar.overtime {
+  background: linear-gradient(135deg, #dc3545, #fd7e14);
+}
+
+.max-hours-indicator {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 2px;
+  background: #495057;
+  z-index: 2;
+}
+
+.hours-labels {
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+  font-size: 10px;
+  color: #6c757d;
+  margin-top: 4px;
+}
+
+.label-start,
+.label-max {
+  background: white;
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.label-total {
+  position: absolute;
+  right: 0;
+  background: #dc3545;
+  color: white;
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-weight: 600;
+}
+
+/* Hours summary */
+.hours-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  text-align: right;
+}
+
+.total-hours {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.hours-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.hours-unit {
+  font-size: 12px;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.overtime-hours {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.overtime-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #dc3545;
+}
+
+.overtime-label {
+  font-size: 10px;
+  color: #dc3545;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.hours-status {
+  margin-top: 4px;
+}
+
+.status-indicator {
+  font-size: 12px;
+}
+
+/* Shift breakdown */
+.shift-breakdown {
+  grid-column: 1 / -1;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e9ecef;
+}
+
+.shift-breakdown h5 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.shift-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.shift-item {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.shift-day {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.shift-time {
+  color: #6c757d;
+}
+
+.shift-duration {
+  font-weight: 600;
+  color: #495057;
+  background: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Hours legend */
+.hours-legend {
+  background: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+  padding: 16px 24px;
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #495057;
+}
+
+.legend-color {
+  width: 16px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.legend-color.regular {
+  background: linear-gradient(135deg, #28a745, #20c997);
+}
+
+.legend-color.overtime {
+  background: linear-gradient(135deg, #dc3545, #fd7e14);
+}
+
+.legend-color.unassigned {
+  background: #6c757d;
+}
+
+/* Responsive design */
+@media (max-width: 1200px) {
+  .staff-hours-item {
+    grid-template-columns: 1fr 1.5fr 100px;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .summary-header {
+    padding: 16px 20px;
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+  
+  .header-stats {
+    justify-content: center;
+  }
+  
+  .stat-item {
+    min-width: 70px;
+    padding: 10px 12px;
+  }
+  
+  .summary-controls {
+    padding: 12px 20px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .sort-controls,
+  .filter-controls {
+    justify-content: space-between;
+  }
+  
+  .hours-list {
+    padding: 16px 20px;
+  }
+  
+  .staff-hours-item {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    text-align: center;
+  }
+  
+  .staff-info {
+    align-items: center;
+  }
+  
+  .staff-details {
+    justify-content: center;
+  }
+  
+  .hours-summary {
+    align-items: center;
+    text-align: center;
+  }
+  
+  .shift-list {
+    grid-template-columns: 1fr;
+  }
+  
+  .hours-legend {
+    padding: 12px 20px;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  
+  .stat-item {
+    min-width: auto;
+  }
+  
+  .staff-hours-item.clickable {
+    margin: 0 -12px;
+    padding: 12px;
+  }
+  
+  .staff-name {
+    font-size: 14px;
+  }
+  
+  .hours-value {
+    font-size: 20px;
+  }
+  
+  .shift-breakdown {
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .staff-hours-summary {
+    border: 2px solid #000;
+  }
+  
+  .staff-hours-item.overtime {
+    background: #f8d7da;
+  }
+  
+  .staff-hours-item.normal {
+    background: #d4edda;
+  }
+  
+  .staff-hours-item.undertime {
+    background: #fff3cd;
+  }
+  
+  .hours-bar.regular {
+    background: #28a745;
+  }
+  
+  .hours-bar.overtime {
+    background: #dc3545;
+  }
+}
+
+/* Print styles */
+@media print {
+  .staff-hours-summary {
+    box-shadow: none;
+    border: 1px solid #000;
+  }
+  
+  .summary-controls {
+    display: none;
+  }
+  
+  .staff-hours-item.clickable:hover {
+    transform: none;
+    box-shadow: none;
+  }
+}

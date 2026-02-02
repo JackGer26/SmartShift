@@ -66,6 +66,76 @@ const staffSchema = new mongoose.Schema({
       message: 'Available day must be one of: {VALUES}'
     }
   }],
+  
+  // Preference fields for soft constraint scoring
+  preferredDays: [{
+    type: String,
+    enum: {
+      values: DAYS_OF_WEEK,
+      message: 'Preferred day must be one of: {VALUES}'
+    }
+  }],
+  avoidDays: [{
+    type: String,
+    enum: {
+      values: DAYS_OF_WEEK,
+      message: 'Avoid day must be one of: {VALUES}'
+    }
+  }],
+  preferredTimeSlots: [{
+    startTime: {
+      type: String,
+      validate: {
+        validator: function(time) {
+          return PATTERNS.TIME_24H.test(time);
+        },
+        message: 'Start time must be in HH:MM format'
+      }
+    },
+    endTime: {
+      type: String,
+      validate: {
+        validator: function(time) {
+          return PATTERNS.TIME_24H.test(time);
+        },
+        message: 'End time must be in HH:MM format'
+      }
+    },
+    preference: {
+      type: String,
+      enum: ['strongly_prefer', 'prefer', 'neutral', 'avoid'],
+      default: 'prefer'
+    }
+  }],
+  timePreference: {
+    type: String,
+    enum: ['early', 'late', 'night', 'flexible'],
+    default: 'flexible'
+  },
+  weekendPreference: {
+    type: String,
+    enum: ['prefer', 'neutral', 'avoid'],
+    default: 'neutral'
+  },
+  
+  // Experience and performance fields
+  experienceYears: {
+    type: Number,
+    min: 0,
+    max: 50
+  },
+  performanceRating: {
+    type: Number,
+    min: 1,
+    max: 5,
+    validate: {
+      validator: function(rating) {
+        return Number.isInteger(rating);
+      },
+      message: 'Performance rating must be an integer from 1 to 5'
+    }
+  },
+  
   isActive: {
     type: Boolean,
     default: true
@@ -74,6 +144,17 @@ const staffSchema = new mongoose.Schema({
   startDate: {
     type: Date,
     default: Date.now
+  },
+  dateOfBirth: {
+    type: Date,
+    validate: {
+      validator: function(date) {
+        // Must be at least 16 years old (UK minimum working age)
+        const age = Math.floor((new Date() - date) / (365.25 * 24 * 60 * 60 * 1000));
+        return age >= 16;
+      },
+      message: 'Staff member must be at least 16 years old'
+    }
   },
   emergencyContact: {
     name: String,
@@ -98,6 +179,18 @@ staffSchema.virtual('weeklyCost').get(function() {
 // Instance method - check if available on specific day
 staffSchema.methods.isAvailableOn = function(dayName) {
   return this.availableDays.includes(dayName.toLowerCase());
+};
+
+// Instance method - calculate current age
+staffSchema.methods.getAge = function() {
+  if (!this.dateOfBirth) return null;
+  return Math.floor((new Date() - this.dateOfBirth) / (365.25 * 24 * 60 * 60 * 1000));
+};
+
+// Instance method - check if minor (under 18)
+staffSchema.methods.isMinor = function() {
+  const age = this.getAge();
+  return age !== null && age < 18;
 };
 
 // Instance method - check if can work additional hours

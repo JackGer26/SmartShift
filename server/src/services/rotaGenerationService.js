@@ -2,6 +2,7 @@ const Staff = require('../models/Staff');
 const TimeOff = require('../models/TimeOff');
 const ShiftTemplate = require('../models/ShiftTemplate');
 const RotaWeek = require('../models/RotaWeek');
+const SoftConstraintScorer = require('../utils/softConstraintScorer');
 const { getWeekStart, getWeekEnd, getWeekDates, getDayName, calculateShiftDuration } = require('../utils/dateUtils');
 
 /**
@@ -335,71 +336,15 @@ class RotaGenerationService {
   }
 
   /**
-   * Score staff for slot assignment (soft preferences)
+   * Score staff for slot assignment using enhanced soft constraints
    */
   scoreStaffForSlot(slot, eligibleStaff, staffHourTracker, context) {
-    const scoredStaff = eligibleStaff.map(staff => {
-      const staffId = staff._id.toString();
-      const tracker = staffHourTracker[staffId];
-      
-      let scores = {
-        availability: 0,
-        hourBalance: 0,
-        fairness: 0,
-        seniority: 0,
-        preference: 0
-      };
-
-      // Availability score (0-25 points)
-      // Higher score for staff with more available hours
-      const remainingCapacity = tracker.maxHours - tracker.scheduledHours;
-      const capacityRatio = remainingCapacity / tracker.maxHours;
-      scores.availability = capacityRatio * 25;
-
-      // Hour balance score (0-25 points)
-      // Prefer staff closer to their contracted hours
-      if (tracker.contractedHours > 0) {
-        const hoursNeeded = Math.max(0, tracker.contractedHours - tracker.scheduledHours);
-        const hoursRatio = Math.min(1, hoursNeeded / tracker.contractedHours);
-        scores.hourBalance = hoursRatio * 25;
-      } else {
-        scores.hourBalance = 15; // Default score for non-contracted staff
-      }
-
-      // Fairness score (0-25 points)
-      // Prefer staff with fewer assigned shifts for fairness
-      const avgShifts = Object.values(staffHourTracker)
-        .reduce((sum, t) => sum + t.shiftCount, 0) / Object.keys(staffHourTracker).length;
-      const fairnessRatio = Math.max(0, 1 - (tracker.shiftCount / (avgShifts + 1)));
-      scores.fairness = fairnessRatio * 25;
-
-      // Seniority/experience score (0-15 points)
-      // This could be based on staff level, experience, etc.
-      // For now, using role hierarchy as proxy
-      const roleHierarchy = { manager: 15, chef: 12, waiter: 8, bartender: 10, cleaner: 5 };
-      scores.seniority = roleHierarchy[staff.role] || 5;
-
-      // Preference score (0-10 points)
-      // This could be based on staff preferences for specific days/times
-      // For now, give bonus for working preferred days
-      scores.preference = 5; // Default neutral score
-
-      const totalScore = Object.values(scores).reduce((sum, score) => sum + score, 0);
-
-      return {
-        staff,
-        scores,
-        totalScore,
-        debugInfo: {
-          remainingCapacity: remainingCapacity.toFixed(1),
-          scheduledHours: tracker.scheduledHours.toFixed(1),
-          shiftCount: tracker.shiftCount
-        }
-      };
-    });
-
-    // Sort by total score (highest first)
-    return scoredStaff.sort((a, b) => b.totalScore - a.totalScore);
+    return SoftConstraintScorer.scoreMultipleStaff(
+      eligibleStaff,
+      slot,
+      context,
+      staffHourTracker
+    );
   }
 
   /**

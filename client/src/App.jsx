@@ -1,5 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AppProvider } from './context/AppContext';
 import AppShell from './components/layout/AppShell';
+import NotificationToast from './components/ui/NotificationToast';
 import StaffPage from './pages/StaffPage';
 import TimeOffPage from './pages/TimeOffPage';
 import ShiftTemplatesPage from './pages/ShiftTemplatesPage';
@@ -12,6 +14,14 @@ import './App.css';
  * 
  * Handles client-side routing for the restaurant scheduling application.
  * Uses React Router for navigation between different management pages.
+ * Integrates global state management with AppProvider.
+ * 
+ * Features:
+ * - Global state management via AppContext
+ * - Client-side routing with React Router
+ * - Consistent layout with AppShell
+ * - Global notifications with NotificationToast
+ * - Error boundary handling
  * 
  * Pages:
  * - HomePage: Landing page with overview
@@ -22,17 +32,20 @@ import './App.css';
  */
 function App() {
   return (
-    <Router>
-      <AppShell>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/staff" element={<StaffPage />} />
-          <Route path="/time-off" element={<TimeOffPage />} />
-          <Route path="/shift-templates" element={<ShiftTemplatesPage />} />
-          <Route path="/rota-builder" element={<RotaBuilderPage />} />
-        </Routes>
-      </AppShell>
-    </Router>
+    <AppProvider>
+      <Router>
+        <AppShell>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/staff" element={<StaffPage />} />
+            <Route path="/time-off" element={<TimeOffPage />} />
+            <Route path="/shift-templates" element={<ShiftTemplatesPage />} />
+            <Route path="/rota-builder" element={<RotaBuilderPage />} />
+          </Routes>
+        </AppShell>
+        <NotificationToast />
+      </Router>
+    </AppProvider>
   );
 }
 

@@ -1,0 +1,243 @@
+/* TimeOffForm - Add/edit time off request form */
+.time-off-form-modal {
+  max-width: 700px;
+}
+
+.time-off-form {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Form grid layout */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-label {
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.char-count {
+  font-weight: 400;
+  color: #6c757d;
+  font-size: 12px;
+}
+
+/* Form inputs */
+.form-input,
+.form-select,
+.form-textarea {
+  padding: 12px;
+  border: 2px solid #dee2e6;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  background-color: white;
+}
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.form-input.error,
+.form-select.error,
+.form-textarea.error {
+  border-color: #e74c3c;
+  box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.1);
+}
+
+.form-select {
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'><path fill='%23666' d='M8 12l-4-4h8l-4 4z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px;
+  padding-right: 36px;
+  appearance: none;
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 80px;
+  line-height: 1.5;
+}
+
+/* Error messages */
+.error-message {
+  color: #e74c3c;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+/* Duration display */
+.duration-display {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.duration-label {
+  font-weight: 600;
+  color: #495057;
+  font-size: 14px;
+}
+
+.duration-value {
+  color: #3498db;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+/* Form validation states */
+.form-group.valid .form-input,
+.form-group.valid .form-select,
+.form-group.valid .form-textarea {
+  border-color: #28a745;
+}
+
+.form-group.valid .form-label::after {
+  content: "\2713";
+  color: #28a745;
+  font-weight: bold;
+  margin-left: 8px;
+}
+
+/* Modal specific styles */
+.time-off-form-modal .modal-body {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.time-off-form-modal .modal-header {
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  color: white;
+  border-bottom: none;
+}
+
+.time-off-form-modal .modal-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.time-off-form-modal .modal-close {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 28px;
+}
+
+.time-off-form-modal .modal-close:hover {
+  color: white;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Required field indicator */
+.form-label::before {
+  content: "";
+}
+
+.form-group:has([required]) .form-label::after {
+  content: " *";
+  color: #e74c3c;
+  font-weight: bold;
+}
+
+/* Loading state */
+.form-loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.form-loading .form-input,
+.form-loading .form-select,
+.form-loading .form-textarea {
+  background-color: #f8f9fa;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .time-off-form-modal {
+    max-width: 100%;
+    margin: 0;
+    height: 100vh;
+    border-radius: 0;
+  }
+  
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .time-off-form-modal .modal-body {
+    max-height: none;
+    padding: 20px;
+  }
+  
+  .time-off-form-modal .modal-actions {
+    padding: 16px 20px;
+  }
+  
+  .form-input,
+  .form-select,
+  .form-textarea {
+    padding: 10px;
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+  
+  .duration-display {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}
+
+@media (max-width: 480px) {
+  .time-off-form-modal .modal-header {
+    padding: 16px 20px;
+  }
+  
+  .time-off-form-modal .modal-header h2 {
+    font-size: 18px;
+  }
+  
+  .form-group {
+    gap: 4px;
+  }
+  
+  .form-label {
+    font-size: 13px;
+  }
+  
+  .char-count {
+    font-size: 11px;
+  }
+}

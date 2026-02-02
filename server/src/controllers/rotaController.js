@@ -1,6 +1,7 @@
 const RotaWeek = require('../models/RotaWeek');
 const Staff = require('../models/Staff');
 const rotaGenerationService = require('../services/rotaGenerationService');
+const HardConstraintValidator = require('../utils/hardConstraintValidator');
 const asyncHandler = require('../utils/asyncHandler');
 const { NotFoundError, ValidationError } = require('../utils/errors');
 const { getWeekStart, getDayName } = require('../utils/dateUtils');
@@ -339,6 +340,184 @@ const getRotaStats = asyncHandler(async (req, res) => {
       weekStart: rota.weekStartDate,
       status: rota.status,
       statistics: stats
+    }
+  });
+});
+
+// @desc    Validate staff assignment against hard constraints
+// @route   POST /api/rota/validate-assignment
+// @access  Public
+const validateStaffAssignment = asyncHandler(async (req, res) => {
+  const { staffId, shiftDate, startTime, endTime, requiredRole, rotaId } = req.body;
+
+  if (!staffId || !shiftDate || !startTime || !endTime || !requiredRole) {
+    throw new ValidationError('Missing required fields: staffId, shiftDate, startTime, endTime, requiredRole');
+  }
+
+  // Prepare assignment object
+  const assignment = {
+    staffId,
+    shiftDate: new Date(shiftDate),
+    startTime,
+    endTime,
+    requiredRole
+  };
+
+  // Get existing assignments context if rotaId provided
+  let context = {};
+  if (rotaId) {
+    const rota = await RotaWeek.findById(rotaId);
+    if (rota) {
+      context.existingAssignments = rota.shifts;
+      
+      // Build staff hour tracker
+      context.staffHourTracker = {};
+      rota.shifts.forEach(shift => {
+        if (shift.staffId) {
+          const staffId = shift.staffId.toString();
+          const duration = calculateShiftDuration(shift.startTime, shift.endTime);
+          
+          if (!context.staffHourTracker[staffId]) {
+            context.staffHourTracker[staffId] = { scheduledHours: 0 };
+          }
+          context.staffHourTracker[staffId].scheduledHours += duration;
+        }
+      });
+    }
+  }
+
+  // Validate the assignment
+  const validation = await HardConstraintValidator.validateStaffAssignment(assignment, context);
+
+  res.json({
+    success: true,
+    data: {
+      assignment,
+      validation,
+      canAssign: validation.isValid,
+      constraints: HardConstraintValidator.getConstraintConfig()
+    }
+  });
+});
+
+// @desc    Get soft constraint scoring analytics for staff assignment
+// @route   POST /api/rota/score-assignment
+// @access  Public
+const getAssignmentScoring = asyncHandler(async (req, res) => {
+  const { staffList, shiftDate, startTime, endTime, requiredRole, rotaId } = req.body;
+
+  if (!staffList || !shiftDate || !startTime || !endTime || !requiredRole) {
+    throw new ValidationError('Missing required fields: staffList, shiftDate, startTime, endTime, requiredRole');
+  }
+
+  // Get full staff details
+  const fullStaffDetails = await Staff.find({
+    _id: { $in: staffList },
+    isActive: true
+  });
+
+  // Prepare slot object
+  const slot = {
+    shift: {
+      date: new Date(shiftDate),
+      dayName: getDayName(new Date(shiftDate)).toLowerCase(),
+      startTime,
+      endTime,
+      shiftDuration: calculateShiftDuration(startTime, endTime)
+    },
+    requiredRole
+  };
+
+  // Build context and staff hour tracker
+  let context = {};
+  let staffHourTracker = {};
+  
+  // Initialize basic tracker
+  fullStaffDetails.forEach(staff => {
+    staffHourTracker[staff._id.toString()] = {
+      staff: staff,
+      scheduledHours: 0,
+      shiftCount: 0,
+      maxHours: staff.maxHoursPerWeek || 40,
+      contractedHours: staff.maxHoursPerWeek || 0,
+      shifts: []
+    };
+  });
+
+  if (rotaId) {
+    const rota = await RotaWeek.findById(rotaId);
+    if (rota) {
+      context.existingAssignments = rota.shifts;
+      
+      // Update staff hour tracker with current assignments
+      rota.shifts.forEach(shift => {
+        if (shift.staffId) {
+          const staffId = shift.staffId.toString();
+          const duration = calculateShiftDuration(shift.startTime, shift.endTime);
+          
+          if (staffHourTracker[staffId]) {
+            staffHourTracker[staffId].scheduledHours += duration;
+            staffHourTracker[staffId].shiftCount += 1;
+            staffHourTracker[staffId].shifts.push({
+              date: shift.date,
+              startTime: shift.startTime,
+              endTime: shift.endTime,
+              duration: duration
+            });
+          }
+        }
+      });
+    }
+  }
+
+  // Get scoring from soft constraint scorer
+  const SoftConstraintScorer = require('../utils/softConstraintScorer');
+  const scoredStaff = SoftConstraintScorer.scoreMultipleStaff(
+    fullStaffDetails,
+    slot,
+    context,
+    staffHourTracker
+  );
+
+  res.json({
+    success: true,
+    data: {
+      slot,
+      scoredStaff,
+      scoringConfig: SoftConstraintScorer.getScoringConfig(),
+      analysis: {
+        totalStaff: scoredStaff.length,
+        averageScore: scoredStaff.reduce((sum, s) => sum + s.totalScore, 0) / scoredStaff.length,
+        bestMatch: scoredStaff[0],
+        scoreRange: {
+          highest: Math.max(...scoredStaff.map(s => s.totalScore)),
+          lowest: Math.min(...scoredStaff.map(s => s.totalScore))
+        }
+      }
+    }
+  });
+});
+
+// @desc    Validate entire rota against hard constraints
+// @route   POST /api/rota/:id/validate
+// @access  Public
+const validateEntireRota = asyncHandler(async (req, res) => {
+  const rota = await RotaWeek.findById(req.params.id)
+    .populate('shifts.staffId', 'name email role maxHoursPerWeek dateOfBirth availableDays');
+
+  if (!rota) {
+    throw new NotFoundError('Rota not found');
+  }
+
+  const validation = await HardConstraintValidator.validateRotaConstraints(rota._id, rota.shifts);
+
+  res.json({
+    success: true,
+    data: {
+      rotaId: rota._id,
+      weekStart: rota.weekStartDate,
+      validation,
+      constraintConfig: HardConstraintValidator.getConstraintConfig()
     }
   });
 });
@@ -765,5 +944,8 @@ module.exports = {
   deleteRotaWeek,
   exportRotaAsCSV,
   getRotaStats,
+  validateStaffAssignment,
+  getAssignmentScoring,
+  validateEntireRota,
   cloneRota
 };

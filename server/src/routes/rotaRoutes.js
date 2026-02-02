@@ -9,6 +9,9 @@ const {
   getRotaWeekByDate,
   exportRotaAsCSV,
   getRotaStats,
+  validateStaffAssignment,
+  getAssignmentScoring,
+  validateEntireRota,
   cloneRota
 } = require('../controllers/rotaController');
 const {
@@ -45,6 +48,15 @@ router.get('/:id/stats', validateObjectId, getRotaStats);
 // GET /api/rota/:id/export/csv - Export rota as CSV
 // Query params: format (detailed|summary)
 router.get('/:id/export/csv', validateObjectId, exportRotaAsCSV);
+
+// POST /api/rota/validate-assignment - Validate staff assignment against hard constraints
+router.post('/validate-assignment', validateStaffAssignment);
+
+// POST /api/rota/score-assignment - Get soft constraint scoring for staff assignment
+router.post('/score-assignment', getAssignmentScoring);
+
+// POST /api/rota/:id/validate - Validate entire rota against hard constraints
+router.post('/:id/validate', validateObjectId, validateEntireRota);
 
 // PUT /api/rota/:id - Save manual edits to rota
 router.put('/:id', validateObjectId, validateRota, updateRotaWeek);
