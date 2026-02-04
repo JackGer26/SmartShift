@@ -34,8 +34,11 @@ export const apiRequest = async (endpoint, options = {}) => {
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error('API Error Response:', JSON.stringify(errorData, null, 2));
+      console.error('Error details array:', errorData.details);
       const error = new Error(errorData.error || `HTTP error! status: ${response.status}`);
       error.status = response.status;
+      error.details = errorData.details;
       throw error;
     }
 

@@ -9,6 +9,7 @@ const {
 } = require('../controllers/shiftTemplateController');
 const {
   validateShiftTemplate,
+  validateShiftTemplateUpdate,
   validateObjectId
 } = require('../utils/validation');
 
@@ -34,9 +35,9 @@ router.get('/:id', validateObjectId, getShiftTemplateById);
 router.post('/', validateShiftTemplate, createShiftTemplate);
 
 // PUT /api/shift-templates/:id - Update shift template
-router.put('/:id', validateObjectId, validateShiftTemplate, updateShiftTemplate);
+router.put('/:id', validateObjectId, validateShiftTemplateUpdate, updateShiftTemplate);
 
-// DELETE /api/shift-templates/:id - Soft delete shift template (set isActive = false)
+// DELETE /api/shift-templates/:id - Delete shift template permanently
 router.delete('/:id', validateObjectId, deleteShiftTemplate);
 
 module.exports = router;

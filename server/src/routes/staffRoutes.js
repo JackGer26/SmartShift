@@ -5,7 +5,9 @@ const {
   createStaff,
   updateStaff,
   deleteStaff,
-  cleanupStaffRoles
+  cleanupStaffRoles,
+  debugEmail,
+  cleanupEmail
 } = require('../controllers/staffController');
 const { validateStaff, validateObjectId } = require('../utils/validation');
 
@@ -35,5 +37,11 @@ router.delete('/:id', validateObjectId, deleteStaff);
 
 // POST /api/staff/cleanup-roles - Cleanup and standardize staff roles
 router.post('/cleanup-roles', cleanupStaffRoles);
+
+// GET /api/staff/debug-email/:email - Debug email duplicates
+router.get('/debug-email/:email', debugEmail);
+
+// DELETE /api/staff/cleanup-email/:email - Hard delete inactive records for email
+router.delete('/cleanup-email/:email', cleanupEmail);
 
 module.exports = router;

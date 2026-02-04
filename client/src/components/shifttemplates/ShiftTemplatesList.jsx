@@ -33,7 +33,14 @@ const ShiftTemplatesList = ({
   const filteredTemplates = templates.filter(template => {
     if (!showInactive && !template.isActive) return false;
     if (filterDay !== 'all' && template.dayOfWeek.toLowerCase() !== filterDay) return false;
-    if (filterRole !== 'all' && template.requiredRole !== filterRole) return false;
+    
+    // Handle role filtering with new and old formats
+    if (filterRole !== 'all') {
+      const roleReqs = getTemplateRoles(template);
+      const hasRole = roleReqs.some(req => req.role === filterRole);
+      if (!hasRole) return false;
+    }
+    
     return true;
   });
 
@@ -125,6 +132,29 @@ const ShiftTemplatesList = ({
   // Get priority stars
   const getPriorityStars = (priority) => {
     return '⭐'.repeat(Math.max(1, Math.min(5, priority)));
+  };
+
+  // Get template roles as array (for backward compatibility)
+  const getTemplateRoles = (template) => {
+    // New format with role requirements
+    if (template.roleRequirements && template.roleRequirements.length > 0) {
+      return template.roleRequirements;
+    }
+    // Old format with multiple roles
+    if (template.requiredRoles && template.requiredRoles.length > 0) {
+      return template.requiredRoles.map(role => ({ role, count: 1 }));
+    }
+    // Old format with single role
+    if (template.requiredRole) {
+      return [{ role: template.requiredRole, count: template.staffCount || 1 }];
+    }
+    return [];
+  };
+
+  // Format role requirements for display
+  const formatRoleRequirements = (template) => {
+    const roleReqs = getTemplateRoles(template);
+    return roleReqs.map(req => `${req.count} ${formatRoleForDisplay(req.role)}${req.count > 1 ? 's' : ''}`).join(', ');
   };
 
   return (
@@ -228,10 +258,15 @@ const ShiftTemplatesList = ({
                     </div>
                     
                     <div className="template-details">
-                      <span className={getRoleBadge(template.requiredRole)}>
-                        {formatRoleForDisplay(template.requiredRole)}
-                      </span>
-                      <span className="staff-count">{template.staffCount} staff</span>
+                      <div className="template-roles">
+                        {getTemplateRoles(template).map((req, index) => (
+                          <span key={req.role} className={getRoleBadge(req.role)}>
+                            {req.count > 1 && <span className="role-count-badge">{req.count}× </span>}
+                            {formatRoleForDisplay(req.role)}
+                          </span>
+                        ))}
+                      </div>
+                      <span className="staff-count">{template.staffCount} total</span>
                     </div>
                     
                     <div className="template-priority">
@@ -305,9 +340,14 @@ const ShiftTemplatesList = ({
                     <td>{formatTime(template.startTime)} - {formatTime(template.endTime)}</td>
                     <td>{calculateDuration(template.startTime, template.endTime)}h</td>
                     <td>
-                      <span className={getRoleBadge(template.requiredRole)}>
-                        {template.requiredRole}
-                      </span>
+                      <div className="template-roles">
+                        {getTemplateRoles(template).map((req, index) => (
+                          <span key={req.role} className={getRoleBadge(req.role)}>
+                            {req.count > 1 && <span className="role-count-badge">{req.count}× </span>}
+                            {formatRoleForDisplay(req.role)}
+                          </span>
+                        ))}
+                      </div>
                     </td>
                     <td>{template.staffCount}</td>
                     <td>{getPriorityStars(template.priority)}</td>

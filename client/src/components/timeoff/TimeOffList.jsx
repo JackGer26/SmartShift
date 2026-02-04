@@ -17,7 +17,8 @@ const TimeOffList = ({
   timeOffRequests = [], 
   onEdit, 
   onRefresh,
-  selectedTab = 'all' 
+  selectedTab = 'all',
+  onTabChange
 }) => {
   const { showSuccess, showError, makeApiRequest } = useAppContext();
   const [filterStatus, setFilterStatus] = useState(selectedTab);
@@ -120,9 +121,19 @@ const TimeOffList = ({
       sick: '🤒',
       personal: '👤',
       emergency: '🚨',
+      family_emergency: '🚨',
       other: '📋'
     };
     return icons[type] || '📋';
+  };
+
+  // Format reason for display (family_emergency -> Family Emergency)
+  const formatReason = (reason) => {
+    if (!reason) return '';
+    return reason
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
   };
 
   return (
@@ -138,7 +149,10 @@ const TimeOffList = ({
           <button
             key={tab.key}
             className={`filter-tab ${filterStatus === tab.key ? 'active' : ''}`}
-            onClick={() => setFilterStatus(tab.key)}
+            onClick={() => {
+              setFilterStatus(tab.key);
+              if (onTabChange) onTabChange(tab.key);
+            }}
           >
             {tab.label} 
             <span className="tab-count">({tab.count})</span>
@@ -179,8 +193,8 @@ const TimeOffList = ({
                   </td>
                   <td>
                     <div className="type-cell">
-                      <span className="type-icon">{getTypeIcon(request.type)}</span>
-                      <span className="type-text">{request.type}</span>
+                      <span className="type-icon">{getTypeIcon(request.reason)}</span>
+                      <span className="type-text">{formatReason(request.reason)}</span>
                     </div>
                   </td>
                   <td>{formatDate(request.startDate)}</td>
@@ -197,7 +211,7 @@ const TimeOffList = ({
                   </td>
                   <td>
                     <div className="reason-cell">
-                      {request.reason || 'No reason provided'}
+                      {request.notes || 'No reason provided'}
                     </div>
                   </td>
                   <td>

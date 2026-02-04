@@ -39,7 +39,7 @@ router.get('/:id', validateObjectId, getTimeOffById);
 router.post('/', validateTimeOff, createTimeOff);
 
 // PUT /api/time-off/:id - Update time off request
-router.put('/:id', validateObjectId, validateTimeOff, updateTimeOff);
+router.put('/:id', validateObjectId, updateTimeOff);
 
 // DELETE /api/time-off/:id - Delete time off request
 router.delete('/:id', validateObjectId, deleteTimeOff);

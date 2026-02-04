@@ -127,7 +127,7 @@ const deleteTimeOff = async (req, res, next) => {
       });
     }
 
-    await timeOff.remove();
+    await TimeOff.findByIdAndDelete(req.params.id);
 
     res.json({
       success: true,

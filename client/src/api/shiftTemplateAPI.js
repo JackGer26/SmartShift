@@ -19,13 +19,15 @@ import { api } from './api';
 export const getAllShiftTemplates = async (filters = {}) => {
   const queryParams = new URLSearchParams();
   
+  // Always include inactive templates so frontend can filter them
+  queryParams.append('includeInactive', 'true');
+  
   if (filters.dayOfWeek) queryParams.append('dayOfWeek', filters.dayOfWeek);
   if (filters.requiredRole) queryParams.append('requiredRole', filters.requiredRole);
-  if (filters.isActive !== undefined) queryParams.append('isActive', filters.isActive);
   if (filters.priority) queryParams.append('priority', filters.priority);
   
   const queryString = queryParams.toString();
-  const endpoint = queryString ? `/shift-templates?${queryString}` : '/shift-templates';
+  const endpoint = `/shift-templates?${queryString}`;
   
   return await api.get(endpoint);
 };

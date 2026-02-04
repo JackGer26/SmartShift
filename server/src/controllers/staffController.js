@@ -91,16 +91,40 @@ const getStaffById = asyncHandler(async (req, res) => {
 // @route   POST /api/staff
 // @access  Public
 const createStaff = asyncHandler(async (req, res) => {
-  // Check for duplicate email among active staff only
+  console.log('Creating staff with email:', req.body.email);
+  
+  // Normalize email to lowercase for consistent checking
+  const normalizedEmail = req.body.email.toLowerCase();
+  
+  // Check for duplicate email among active staff only (case-insensitive)
   const existingStaff = await Staff.findOne({ 
-    email: req.body.email, 
+    email: { $regex: new RegExp(`^${normalizedEmail}$`, 'i') },
     isActive: true 
   });
+  
+  // Also check for any staff with this email (for debugging)
+  const allStaffWithEmail = await Staff.find({ 
+    email: { $regex: new RegExp(`^${normalizedEmail}$`, 'i') }
+  });
+  console.log('Existing staff with this email:', allStaffWithEmail.map(s => ({ 
+    id: s._id, 
+    name: s.name, 
+    email: s.email, 
+    isActive: s.isActive 
+  })));
+  
   if (existingStaff) {
+    console.log('Found existing active staff:', { id: existingStaff._id, name: existingStaff.name, isActive: existingStaff.isActive });
     throw new ValidationError('Email address already in use by another staff member');
   }
 
-  const staff = await Staff.create(req.body);
+  // Store email in lowercase for consistency
+  const staffData = {
+    ...req.body,
+    email: normalizedEmail
+  };
+
+  const staff = await Staff.create(staffData);
   
   res.status(201).json({
     success: true,
@@ -120,9 +144,11 @@ const updateStaff = asyncHandler(async (req, res) => {
   }
 
   // Check for duplicate email if email is being changed
-  if (req.body.email && req.body.email !== staff.email) {
+  if (req.body.email && req.body.email.toLowerCase() !== staff.email.toLowerCase()) {
+    const normalizedEmail = req.body.email.toLowerCase();
+    
     const existingStaff = await Staff.findOne({ 
-      email: req.body.email,
+      email: { $regex: new RegExp(`^${normalizedEmail}$`, 'i') },
       isActive: true,
       _id: { $ne: req.params.id } 
     });
@@ -131,9 +157,17 @@ const updateStaff = asyncHandler(async (req, res) => {
     }
   }
 
+  // Normalize email before update
+  const updateData = {
+    ...req.body
+  };
+  if (updateData.email) {
+    updateData.email = updateData.email.toLowerCase();
+  }
+
   staff = await Staff.findByIdAndUpdate(
     req.params.id,
-    req.body,
+    updateData,
     {
       new: true,
       runValidators: true
@@ -157,15 +191,105 @@ const deleteStaff = asyncHandler(async (req, res) => {
     throw new NotFoundError('Staff member');
   }
 
+  console.log('Deleting staff:', { id: staff._id, name: staff.name, email: staff.email, currentlyActive: staff.isActive });
+
   // Soft delete by setting isActive to false
+  // Also modify email to allow reuse of the original email
+  const timestamp = Date.now();
+  const originalEmail = staff.email;
+  
   staff.isActive = false;
   staff.deactivatedAt = new Date();
+  staff.email = `${staff.email}.deactivated.${timestamp}`; // Make email unique
   await staff.save();
+
+  console.log('Staff deactivated successfully:', { 
+    id: staff._id, 
+    name: staff.name, 
+    originalEmail: originalEmail,
+    newEmail: staff.email,
+    isActive: staff.isActive 
+  });
 
   res.json({
     success: true,
     message: 'Staff member deactivated successfully',
     data: { id: staff._id, isActive: false }
+  });
+});
+
+// @desc    Debug: Check email duplicates and clean up
+// @route   GET /api/staff/debug-email/:email
+// @access  Public
+const debugEmail = asyncHandler(async (req, res) => {
+  const email = req.params.email.toLowerCase();
+  
+  // Find all staff with this email (case-insensitive)
+  const allStaff = await Staff.find({ 
+    email: { $regex: new RegExp(`^${email}$`, 'i') }
+  });
+  const activeStaff = await Staff.find({ 
+    email: { $regex: new RegExp(`^${email}$`, 'i') },
+    isActive: true 
+  });
+  const inactiveStaff = await Staff.find({ 
+    email: { $regex: new RegExp(`^${email}$`, 'i') },
+    isActive: false 
+  });
+  
+  console.log('=== EMAIL DEBUG ===');
+  console.log('Email:', email);
+  console.log('Total records:', allStaff.length);
+  console.log('Active records:', activeStaff.length);
+  console.log('Inactive records:', inactiveStaff.length);
+  
+  allStaff.forEach((staff, index) => {
+    console.log(`Record ${index + 1}:`, {
+      id: staff._id,
+      name: staff.name,
+      email: staff.email,
+      isActive: staff.isActive,
+      createdAt: staff.createdAt,
+      deactivatedAt: staff.deactivatedAt
+    });
+  });
+  
+  res.json({
+    success: true,
+    data: {
+      email,
+      total: allStaff.length,
+      active: activeStaff.length,
+      inactive: inactiveStaff.length,
+      records: allStaff.map(staff => ({
+        id: staff._id,
+        name: staff.name,
+        isActive: staff.isActive,
+        createdAt: staff.createdAt,
+        deactivatedAt: staff.deactivatedAt
+      }))
+    }
+  });
+});
+
+// @desc    Hard delete all inactive staff with specific email (for development)
+// @route   DELETE /api/staff/cleanup-email/:email
+// @access  Public
+const cleanupEmail = asyncHandler(async (req, res) => {
+  const email = req.params.email.toLowerCase();
+  
+  // Delete all inactive staff with this email (case-insensitive)
+  const result = await Staff.deleteMany({ 
+    email: { $regex: new RegExp(`^${email}$`, 'i') },
+    isActive: false 
+  });
+  
+  console.log(`Cleaned up ${result.deletedCount} inactive records for email: ${email}`);
+  
+  res.json({
+    success: true,
+    message: `Deleted ${result.deletedCount} inactive records for ${email}`,
+    data: { deletedCount: result.deletedCount }
   });
 });
 
@@ -272,5 +396,7 @@ module.exports = {
   createStaff,
   updateStaff,
   deleteStaff,
-  cleanupStaffRoles
+  cleanupStaffRoles,
+  debugEmail,
+  cleanupEmail
 };

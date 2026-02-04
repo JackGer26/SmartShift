@@ -140,7 +140,15 @@ export const AppProvider = ({ children }) => {
 
       return result;
     } catch (error) {
+      console.error('AppContext caught error:', error);
+      console.error('Error details:', error.details);
       const message = error.response?.data?.message || error.message || errorMessage;
+      
+      // If there are validation details, show them
+      if (error.details && Array.isArray(error.details)) {
+        const detailedMessage = `${message}\n${error.details.map(d => `- ${d.field}: ${d.message}`).join('\n')}`;
+        console.error('Detailed error message:', detailedMessage);
+      }
       
       if (onError) {
         onError(error);

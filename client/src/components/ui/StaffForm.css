@@ -5,6 +5,51 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
 }
 
+/* Validation Summary Styles */
+.validation-summary {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-left: 4px solid #ef4444;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.1);
+}
+
+.validation-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.validation-header h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #dc2626;
+}
+
+.error-icon {
+  font-size: 18px;
+}
+
+.validation-list {
+  margin: 0;
+  padding-left: 20px;
+  color: #b91c1c;
+}
+
+.validation-item {
+  margin-bottom: 4px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.validation-item:last-child {
+  margin-bottom: 0;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -44,6 +89,13 @@
   border-radius: 2px;
 }
 
+.section-description {
+  margin: -8px 0 16px 0;
+  font-size: 13px;
+  color: #6b7280;
+  font-style: italic;
+}
+
 .form-group {
   margin-bottom: 20px;
   position: relative;
@@ -60,6 +112,13 @@
   font-size: 14px;
   color: #374151;
   transition: color 0.2s ease;
+  position: relative;
+}
+
+.form-label::after {
+  content: ' *';
+  color: #ef4444;
+  font-weight: 600;
 }
 
 .form-input {
@@ -146,6 +205,28 @@
   font-size: 13px;
   color: #ef4444;
   font-weight: 500;
+}
+
+.error-message::before {
+  content: '⚠️';
+  font-size: 12px;
+}
+
+/* Enhanced error state styling */
+.form-group.has-error .form-label {
+  color: #dc2626;
+}
+
+.form-group.has-error .form-input {
+  border-color: #ef4444;
+  background-color: #fef2f2 !important;
+  animation: shake 0.3s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
 }
 
 /* Universal cursor fix for all inputs in staff form */

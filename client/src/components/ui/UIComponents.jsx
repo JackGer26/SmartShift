@@ -13,7 +13,7 @@ export const LoadingSpinner = ({ size = 'medium', message = 'Loading...' }) => {
       <div className={`loading-spinner ${sizeClasses[size]}`}></div>
       {message && <p className="loading-message">{message}</p>}
       
-      <style jsx>{`
+      <style>{`
         .loading-container {
           display: flex;
           flex-direction: column;
@@ -58,7 +58,7 @@ export const ErrorMessage = ({ message, onRetry }) => {
         </button>
       )}
       
-      <style jsx>{`
+      <style>{`
         .error-container {
           text-align: center;
           padding: 30px;
@@ -106,7 +106,7 @@ export const EmptyState = ({ icon = '📝', title, description, action }) => {
       <p className="empty-description">{description}</p>
       {action && <div className="empty-action">{action}</div>}
       
-      <style jsx>{`
+      <style>{`
         .empty-state {
           text-align: center;
           padding: 60px 20px;

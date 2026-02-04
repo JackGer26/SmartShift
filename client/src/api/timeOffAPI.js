@@ -85,10 +85,8 @@ export const getTimeOffByStaff = async (staffId, filters = {}) => {
  * @returns {Promise<Object>} Updated request
  */
 export const approveTimeOff = async (id, approvedBy = 'system') => {
-  return await updateTimeOff(id, {
-    status: 'approved',
-    approvedBy,
-    approvedAt: new Date().toISOString()
+  return await api.put(`/time-off/${id}`, {
+    status: 'approved'
   });
 };
 
@@ -100,10 +98,7 @@ export const approveTimeOff = async (id, approvedBy = 'system') => {
  * @returns {Promise<Object>} Updated request
  */
 export const denyTimeOff = async (id, reason, deniedBy = 'system') => {
-  return await updateTimeOff(id, {
-    status: 'denied',
-    deniedBy,
-    deniedAt: new Date().toISOString(),
-    denialReason: reason
+  return await api.put(`/time-off/${id}`, {
+    status: 'denied'
   });
 };

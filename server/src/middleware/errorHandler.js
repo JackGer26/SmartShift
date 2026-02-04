@@ -26,10 +26,14 @@ const errorHandler = (err, req, res, next) => {
 
   // Mongoose validation error - missing or invalid field values
   if (err.name === 'ValidationError') {
-    const errors = Object.values(err.errors).map(val => val.message);
+    const errors = Object.values(err.errors).map(val => ({
+      field: val.path,
+      message: val.message
+    }));
+    console.error('Validation errors:', errors);
     return res.status(400).json({
       success: false,
-      error: 'Validation failed - please check your input',
+      error: 'Validation failed',
       details: errors,
       code: 'VALIDATION_ERROR'
     });

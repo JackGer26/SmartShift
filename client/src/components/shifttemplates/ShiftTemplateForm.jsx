@@ -26,13 +26,13 @@ const ShiftTemplateForm = ({
     dayOfWeek: 'monday',
     startTime: '09:00',
     endTime: '17:00',
-    requiredRole: 'waiter',
-    staffCount: 1,
+    roleRequirements: [{ role: 'waiter', count: 1 }],
     priority: 3,
     description: '',
     isActive: true
   });
   const [errors, setErrors] = useState({});
+  const [warnings, setWarnings] = useState({});
 
   const daysOfWeek = [
     { value: 'monday', label: 'Monday' },
@@ -71,13 +71,31 @@ const ShiftTemplateForm = ({
   // Set form data when editing
   useEffect(() => {
     if (editingTemplate) {
+      let roleRequirements = [];
+      
+      // Handle new format
+      if (editingTemplate.roleRequirements && editingTemplate.roleRequirements.length > 0) {
+        roleRequirements = editingTemplate.roleRequirements;
+      }
+      // Handle old format - multiple roles
+      else if (editingTemplate.requiredRoles && editingTemplate.requiredRoles.length > 0) {
+        roleRequirements = editingTemplate.requiredRoles.map(role => ({ role, count: 1 }));
+      }
+      // Handle old format - single role
+      else if (editingTemplate.requiredRole) {
+        roleRequirements = [{ role: editingTemplate.requiredRole, count: editingTemplate.staffCount || 1 }];
+      }
+      // Default fallback
+      else {
+        roleRequirements = [{ role: 'waiter', count: 1 }];
+      }
+      
       setFormData({
         name: editingTemplate.name,
         dayOfWeek: editingTemplate.dayOfWeek.toLowerCase(),
         startTime: editingTemplate.startTime,
         endTime: editingTemplate.endTime,
-        requiredRole: editingTemplate.requiredRole,
-        staffCount: editingTemplate.staffCount,
+        roleRequirements,
         priority: editingTemplate.priority,
         description: editingTemplate.description || '',
         isActive: editingTemplate.isActive !== undefined ? editingTemplate.isActive : true
@@ -88,6 +106,18 @@ const ShiftTemplateForm = ({
     setErrors({});
   }, [editingTemplate, isOpen]);
 
+  // Update warnings in real-time when role requirements change
+  useEffect(() => {
+    const totalStaff = formData.roleRequirements.reduce((sum, req) => sum + (req.count || 0), 0);
+    const newWarnings = {};
+    
+    if (totalStaff > 0 && totalStaff <= 8) {
+      newWarnings.roleRequirements = `Warning: Only ${totalStaff} staff scheduled. Consider adding more staff for better coverage.`;
+    }
+    
+    setWarnings(newWarnings);
+  }, [formData.roleRequirements]);
+
   // Reset form
   const resetForm = () => {
     setFormData({
@@ -95,8 +125,7 @@ const ShiftTemplateForm = ({
       dayOfWeek: 'monday',
       startTime: '09:00',
       endTime: '17:00',
-      requiredRole: 'waiter',
-      staffCount: 1,
+      roleRequirements: [{ role: 'waiter', count: 1 }],
       priority: 3,
       description: '',
       isActive: true
@@ -118,6 +147,59 @@ const ShiftTemplateForm = ({
     }
   };
 
+  // Handle role selection changes
+  const handleRoleChange = (roleValue, isChecked) => {
+    setFormData(prev => {
+      let updatedRequirements;
+      
+      if (isChecked) {
+        // Add new role with count 1
+        updatedRequirements = [...prev.roleRequirements, { role: roleValue, count: 1 }];
+      } else {
+        // Remove role
+        updatedRequirements = prev.roleRequirements.filter(req => req.role !== roleValue);
+      }
+      
+      return {
+        ...prev,
+        roleRequirements: updatedRequirements
+      };
+    });
+    
+    // Clear error for role field
+    if (errors.roleRequirements) {
+      setErrors(prev => ({ ...prev, roleRequirements: '' }));
+    }
+  };
+
+  // Handle role count changes
+  const handleRoleCountChange = (roleValue, count) => {
+    const numCount = Math.max(1, Math.min(50, parseInt(count) || 1));
+    
+    setFormData(prev => ({
+      ...prev,
+      roleRequirements: prev.roleRequirements.map(req =>
+        req.role === roleValue ? { ...req, count: numCount } : req
+      )
+    }));
+  };
+
+  // Get total staff count
+  const getTotalStaffCount = () => {
+    return formData.roleRequirements.reduce((sum, req) => sum + (req.count || 0), 0);
+  };
+
+  // Check if role is selected
+  const isRoleSelected = (roleValue) => {
+    return formData.roleRequirements.some(req => req.role === roleValue);
+  };
+
+  // Get count for specific role
+  const getRoleCount = (roleValue) => {
+    const requirement = formData.roleRequirements.find(req => req.role === roleValue);
+    return requirement ? requirement.count : 1;
+  };
+
   // Calculate duration
   const calculateDuration = () => {
     if (!formData.startTime || !formData.endTime) return 0;
@@ -137,11 +219,27 @@ const ShiftTemplateForm = ({
   // Validate form
   const validateForm = () => {
     const newErrors = {};
+    const newWarnings = {};
 
     if (!formData.name.trim()) {
       newErrors.name = 'Template name is required';
     } else if (formData.name.length > 100) {
       newErrors.name = 'Name cannot exceed 100 characters';
+    }
+
+    if (!formData.roleRequirements || formData.roleRequirements.length === 0) {
+      newErrors.roleRequirements = 'At least one role must be selected';
+    } else {
+      const totalStaff = getTotalStaffCount();
+      if (totalStaff === 0) {
+        newErrors.roleRequirements = 'Total staff count must be greater than 0';
+      } else if (totalStaff <= 8) {
+        newWarnings.roleRequirements = `Warning: Only ${totalStaff} staff scheduled. Consider adding more staff for better coverage.`;
+      }
+      
+      if (totalStaff > 50) {
+        newErrors.roleRequirements = 'Total staff count cannot exceed 50';
+      }
     }
 
     if (!formData.startTime) {
@@ -161,12 +259,6 @@ const ShiftTemplateForm = ({
       }
     }
 
-    if (formData.staffCount < 1) {
-      newErrors.staffCount = 'At least 1 staff member is required';
-    } else if (formData.staffCount > 50) {
-      newErrors.staffCount = 'Cannot exceed 50 staff members';
-    }
-
     if (formData.priority < 1 || formData.priority > 5) {
       newErrors.priority = 'Priority must be between 1 and 5';
     }
@@ -176,6 +268,7 @@ const ShiftTemplateForm = ({
     }
 
     setErrors(newErrors);
+    setWarnings(newWarnings);
     return Object.keys(newErrors).length === 0;
   };
 
@@ -187,11 +280,19 @@ const ShiftTemplateForm = ({
       return;
     }
 
+    // Only send the new format fields, not the old backward compatibility fields
     const templateData = {
-      ...formData,
       name: formData.name.trim(),
-      description: formData.description.trim()
+      dayOfWeek: formData.dayOfWeek,
+      startTime: formData.startTime,
+      endTime: formData.endTime,
+      roleRequirements: formData.roleRequirements,
+      priority: formData.priority,
+      description: formData.description.trim(),
+      isActive: formData.isActive
     };
+
+    console.log('Submitting template data:', templateData);
 
     try {
       if (editingTemplate) {
@@ -231,7 +332,8 @@ const ShiftTemplateForm = ({
   if (!isOpen) return null;
 
   const duration = calculateDuration();
-  const estimatedCost = duration * formData.staffCount * 15; // £15/hour average
+  const totalStaff = getTotalStaffCount();
+  const estimatedCost = duration * totalStaff * 15; // £15/hour average
 
   return (
     <div className="modal-overlay">
@@ -350,6 +452,10 @@ const ShiftTemplateForm = ({
                     <span className="duration-value">{duration}h</span>
                   </div>
                   <div className="duration-item">
+                    <span className="duration-label">Total Staff:</span>
+                    <span className="duration-value">{totalStaff}</span>
+                  </div>
+                  <div className="duration-item">
                     <span className="duration-label">Est. Cost:</span>
                     <span className="duration-value">£{estimatedCost.toFixed(2)}</span>
                   </div>
@@ -360,49 +466,67 @@ const ShiftTemplateForm = ({
             {/* Role Requirements */}
             <div className="form-section">
               <h3 className="section-title">👥 Role Requirements</h3>
-              <div className="form-grid">
-                <div className="form-group">
-                  <label htmlFor="requiredRole" className="form-label">
-                    Required Role *
-                  </label>
-                  <div className="role-selector">
-                    {roles.map(role => (
-                      <label key={role.value} className="role-option">
-                        <input
-                          type="radio"
-                          name="requiredRole"
-                          value={role.value}
-                          checked={formData.requiredRole === role.value}
-                          onChange={handleInputChange}
-                        />
-                        <div 
-                          className="role-card"
-                          style={{ borderColor: role.color }}
-                        >
-                          <span className="role-label">{role.label}</span>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
+              <div className="form-group full-width">
+                <label className="form-label">
+                  Required Roles * 
+                  <span className="role-count">({formData.roleRequirements.length} role{formData.roleRequirements.length !== 1 ? 's' : ''} | {totalStaff} total staff)</span>
+                </label>
+                <div className={`role-requirements-grid ${errors.roleRequirements ? 'error' : ''}`}>
+                  {roles.map(role => {
+                    const isSelected = isRoleSelected(role.value);
+                    const count = getRoleCount(role.value);
+                    
+                    return (
+                      <div key={role.value} className={`role-requirement-item ${isSelected ? 'selected' : ''}`}>
+                        <label className="role-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => handleRoleChange(role.value, e.target.checked)}
+                          />
+                          <span 
+                            className="role-name"
+                            style={{ borderLeftColor: role.color }}
+                          >
+                            {role.label}
+                          </span>
+                        </label>
+                        {isSelected && (
+                          <div className="role-count-input">
+                            <button
+                              type="button"
+                              className="count-btn"
+                              onClick={() => handleRoleCountChange(role.value, count - 1)}
+                              disabled={count <= 1}
+                            >
+                              −
+                            </button>
+                            <input
+                              type="number"
+                              value={count}
+                              onChange={(e) => handleRoleCountChange(role.value, e.target.value)}
+                              className="count-input"
+                              min={1}
+                              max={50}
+                            />
+                            <button
+                              type="button"
+                              className="count-btn"
+                              onClick={() => handleRoleCountChange(role.value, count + 1)}
+                              disabled={count >= 50}
+                            >
+                              +
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-
-                <div className="form-group">
-                  <label htmlFor="staffCount" className="form-label">
-                    Staff Count *
-                  </label>
-                  <input
-                    type="number"
-                    id="staffCount"
-                    name="staffCount"
-                    value={formData.staffCount}
-                    onChange={handleInputChange}
-                    className={`form-input ${errors.staffCount ? 'error' : ''}`}
-                    min={1}
-                    max={50}
-                    required
-                  />
-                  {errors.staffCount && <span className="error-message">{errors.staffCount}</span>}
-                </div>
+                {errors.roleRequirements && <span className="error-message">{errors.roleRequirements}</span>}
+                {!errors.roleRequirements && warnings.roleRequirements && (
+                  <span className="warning-message">⚠️ {warnings.roleRequirements}</span>
+                )}
               </div>
             </div>
 
@@ -439,7 +563,6 @@ const ShiftTemplateForm = ({
                       checked={formData.isActive}
                       onChange={handleInputChange}
                     />
-                    <span className="checkmark"></span>
                     Template is active
                   </label>
                   <span className="help-text">

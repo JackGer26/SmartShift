@@ -1,6 +1,6 @@
 const { body, param, query, validationResult } = require('express-validator');
 const mongoose = require('mongoose');
-const { STAFF_ROLES, CONSTRAINTS } = require('../models/constants');
+const { STAFF_ROLES, CONSTRAINTS, TIME_OFF_TYPES } = require('../models/constants');
 
 /**
  * Restaurant API Validation Middleware
@@ -11,7 +11,6 @@ const { STAFF_ROLES, CONSTRAINTS } = require('../models/constants');
 
 // Helper constants for validation
 const DAYS_OF_WEEK = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-const TIME_OFF_TYPES = ['holiday', 'sick', 'personal', 'training', 'other'];
 
 /**
  * Custom validation result handler with restaurant-specific error formatting
@@ -192,13 +191,17 @@ const validateShiftTemplate = [
       return true;
     }),
     
-  body('requiredRole')
+  body('roleRequirements')
+    .isArray({ min: 1 })
+    .withMessage('At least one role requirement must be specified'),
+    
+  body('roleRequirements.*.role')
     .isIn(STAFF_ROLES)
     .withMessage(`Role must be one of: ${STAFF_ROLES.join(', ')}`),
     
-  body('staffCount')
-    .isInt({ min: CONSTRAINTS.MIN_STAFF_PER_SHIFT, max: CONSTRAINTS.MAX_STAFF_PER_SHIFT })
-    .withMessage(`Staff count must be between ${CONSTRAINTS.MIN_STAFF_PER_SHIFT} and ${CONSTRAINTS.MAX_STAFF_PER_SHIFT}`),
+  body('roleRequirements.*.count')
+    .isInt({ min: 1, max: CONSTRAINTS.MAX_STAFF_PER_SHIFT })
+    .withMessage(`Role count must be between 1 and ${CONSTRAINTS.MAX_STAFF_PER_SHIFT}`),
     
   body('priority')
     .optional()
@@ -210,6 +213,67 @@ const validateShiftTemplate = [
     .trim()
     .isLength({ max: 200 })
     .withMessage('Description cannot exceed 200 characters'),
+    
+  handleValidationErrors
+];
+
+/**
+ * Shift template validation for updates (all fields optional)
+ */
+const validateShiftTemplateUpdate = [
+  body('name')
+    .optional()
+    .notEmpty()
+    .withMessage('Shift template name cannot be empty')
+    .trim()
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Name must be between 2 and 100 characters'),
+    
+  body('dayOfWeek')
+    .optional()
+    .isIn(DAYS_OF_WEEK)
+    .withMessage(`Day must be one of: ${DAYS_OF_WEEK.join(', ')}`),
+    
+  body('startTime')
+    .optional()
+    .matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/)
+    .withMessage('Start time must be in HH:MM format (24-hour)'),
+    
+  body('endTime')
+    .optional()
+    .matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/)
+    .withMessage('End time must be in HH:MM format (24-hour)'),
+    
+  body('roleRequirements')
+    .optional()
+    .isArray({ min: 1 })
+    .withMessage('At least one role requirement must be specified'),
+    
+  body('roleRequirements.*.role')
+    .optional()
+    .isIn(STAFF_ROLES)
+    .withMessage(`Role must be one of: ${STAFF_ROLES.join(', ')}`),
+    
+  body('roleRequirements.*.count')
+    .optional()
+    .isInt({ min: 1, max: CONSTRAINTS.MAX_STAFF_PER_SHIFT })
+    .withMessage(`Role count must be between 1 and ${CONSTRAINTS.MAX_STAFF_PER_SHIFT}`),
+    
+  body('priority')
+    .optional()
+    .isInt({ min: CONSTRAINTS.SHIFT_PRIORITY_MIN, max: CONSTRAINTS.SHIFT_PRIORITY_MAX })
+    .withMessage(`Priority must be between ${CONSTRAINTS.SHIFT_PRIORITY_MIN} and ${CONSTRAINTS.SHIFT_PRIORITY_MAX}`),
+    
+  body('description')
+    .optional()
+    .trim()
+    .isLength({ max: 200 })
+    .withMessage('Description cannot exceed 200 characters'),
+    
+  body('isActive')
+    .optional()
+    .isBoolean()
+    .withMessage('isActive must be a boolean'),
     
   handleValidationErrors
 ];
@@ -341,6 +405,7 @@ module.exports = {
   validateStaff,
   validateTimeOff,
   validateShiftTemplate,
+  validateShiftTemplateUpdate,
   validateObjectId,
   validateWeekDate,
   validateDateRange,

@@ -4,6 +4,7 @@ import { Modal, ConfirmDialog, Toast } from '../components/ui/Modal';
 import StaffForm from '../components/ui/StaffForm';
 import { LoadingSpinner, ErrorMessage } from '../components/ui/UIComponents';
 import { formatRoleForDisplay } from '../utils/roleUtils';
+import { formatPhoneForDisplay } from '../utils/phoneUtils';
 import { STAFF_ROLES } from '../utils/constants';
 
 /**
@@ -21,7 +22,11 @@ const StaffPage = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showReportsModal, setShowReportsModal] = useState(false);
+  const [showBulkActionsModal, setShowBulkActionsModal] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState(null);
+  const [selectedStaffIds, setSelectedStaffIds] = useState([]);
   const [formLoading, setFormLoading] = useState(false);
 
   // Toast notification state
@@ -80,9 +85,32 @@ const StaffPage = () => {
       setStaff(prev => [...prev, newStaff]);
       setShowAddModal(false);
       showToast('Staff member added successfully!');
+      return { success: true };
     } catch (err) {
       console.error('Error adding staff:', err);
-      showToast('Failed to add staff member', 'error');
+      
+      // Handle specific validation errors
+      if (err.message.includes('already exists') || err.message.includes('Email')) {
+        showToast('Email address already in use by another staff member', 'error');
+        return { 
+          success: false, 
+          errors: { email: 'This email address is already in use by another staff member' },
+          validationSummary: ['Email address is already registered to another staff member']
+        };
+      }
+      
+      // Handle other validation errors
+      if (err.status === 400) {
+        showToast('Please check the form for validation errors', 'error');
+        return { 
+          success: false, 
+          errors: { general: err.message },
+          validationSummary: [err.message || 'Please check all fields and try again']
+        };
+      }
+      
+      showToast('Failed to add staff member. Please try again.', 'error');
+      return { success: false };
     } finally {
       setFormLoading(false);
     }
@@ -98,9 +126,32 @@ const StaffPage = () => {
       setShowEditModal(false);
       setSelectedStaff(null);
       showToast('Staff member updated successfully!');
+      return { success: true };
     } catch (err) {
       console.error('Error updating staff:', err);
-      showToast('Failed to update staff member', 'error');
+      
+      // Handle specific validation errors
+      if (err.message.includes('already exists') || err.message.includes('Email')) {
+        showToast('Email address already in use by another staff member', 'error');
+        return { 
+          success: false, 
+          errors: { email: 'This email address is already in use by another staff member' },
+          validationSummary: ['Email address is already registered to another staff member']
+        };
+      }
+      
+      // Handle other validation errors
+      if (err.status === 400) {
+        showToast('Please check the form for validation errors', 'error');
+        return { 
+          success: false, 
+          errors: { general: err.message },
+          validationSummary: [err.message || 'Please check all fields and try again']
+        };
+      }
+      
+      showToast('Failed to update staff member. Please try again.', 'error');
+      return { success: false };
     } finally {
       setFormLoading(false);
     }
@@ -129,6 +180,87 @@ const StaffPage = () => {
     setShowDeleteDialog(true);
   };
 
+  // Export functionality
+  const exportStaffToCSV = () => {
+    const csvContent = generateCSV(filteredStaff);
+    downloadFile(csvContent, 'staff-list.csv', 'text/csv');
+    showToast('Staff list exported to CSV successfully!');
+  };
+
+  const exportStaffToJSON = () => {
+    const jsonContent = generateJSON(filteredStaff);
+    downloadFile(jsonContent, 'staff-list.json', 'application/json');
+    showToast('Staff list exported to JSON successfully!');
+  };
+
+  const generateCSV = (staffList) => {
+    const headers = [
+      'Name',
+      'Email', 
+      'Phone',
+      'Role',
+      'Hourly Rate (£)',
+      'Max Hours/Week',
+      'Available Days',
+      'Status',
+      'Created Date'
+    ];
+
+    const rows = staffList.map(member => [
+      `"${member.name}"`,
+      `"${member.email}"`,
+      `"${formatPhoneForDisplay(member.phone)}"`,
+      `"${formatRoleForDisplay(member.role)}"`,
+      member.hourlyRate.toFixed(2),
+      member.maxHoursPerWeek,
+      `"${member.availableDays.map(day => day.charAt(0).toUpperCase() + day.slice(1)).join(', ')}"`,
+      member.isActive ? 'Active' : 'Inactive',
+      new Date(member.createdAt).toLocaleDateString('en-GB') // DD/MM/YYYY format
+    ]);
+
+    return [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+  };
+
+  const generateJSON = (staffList) => {
+    const exportData = staffList.map(member => ({
+      id: member._id,
+      name: member.name,
+      email: member.email,
+      phone: formatPhoneForDisplay(member.phone),
+      role: member.role,
+      roleDisplay: formatRoleForDisplay(member.role),
+      hourlyRate: member.hourlyRate,
+      maxHoursPerWeek: member.maxHoursPerWeek,
+      availableDays: member.availableDays,
+      isActive: member.isActive,
+      createdAt: member.createdAt,
+      weeklyCost: (member.hourlyRate * member.maxHoursPerWeek).toFixed(2)
+    }));
+
+    return JSON.stringify({
+      exportDate: new Date().toISOString(),
+      totalStaff: exportData.length,
+      activeStaff: exportData.filter(s => s.isActive).length,
+      data: exportData
+    }, null, 2);
+  };
+
+  const downloadFile = (content, filename, mimeType) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const getRoleStats = () => {
     return {
       total: staff.length,
@@ -138,6 +270,92 @@ const StaffPage = () => {
       bartender: staff.filter(s => s.role === 'bartender').length,
       cleaner: staff.filter(s => s.role === 'cleaner').length,
     };
+  };
+
+  // Reports data calculations
+  const getReportsData = () => {
+    const activeStaff = staff.filter(s => s.isActive);
+    
+    // Role distribution
+    const roleBreakdown = {};
+    STAFF_ROLES.forEach(role => {
+      roleBreakdown[role] = activeStaff.filter(s => s.role === role).length;
+    });
+
+    // Cost analysis
+    const totalWeeklyCost = activeStaff.reduce((sum, s) => sum + (s.hourlyRate * s.maxHoursPerWeek), 0);
+    const avgHourlyRate = activeStaff.length ? activeStaff.reduce((sum, s) => sum + s.hourlyRate, 0) / activeStaff.length : 0;
+
+    // Availability by day
+    const availabilityByDay = {
+      monday: 0, tuesday: 0, wednesday: 0, thursday: 0,
+      friday: 0, saturday: 0, sunday: 0
+    };
+    activeStaff.forEach(member => {
+      member.availableDays.forEach(day => {
+        if (availabilityByDay[day] !== undefined) {
+          availabilityByDay[day]++;
+        }
+      });
+    });
+
+    // Compliance checks
+    const lowPaidStaff = activeStaff.filter(s => s.hourlyRate < 10.50).length;
+    const overworkedStaff = activeStaff.filter(s => s.maxHoursPerWeek > 48).length;
+
+    return {
+      roleBreakdown,
+      totalWeeklyCost,
+      avgHourlyRate,
+      availabilityByDay,
+      lowPaidStaff,
+      overworkedStaff,
+      totalActive: activeStaff.length,
+      totalInactive: staff.filter(s => !s.isActive).length
+    };
+  };
+
+  // Bulk actions functionality
+  const handleSelectAll = (checked) => {
+    if (checked) {
+      setSelectedStaffIds(filteredStaff.map(member => member._id));
+    } else {
+      setSelectedStaffIds([]);
+    }
+  };
+
+  const handleSelectStaff = (staffId, checked) => {
+    if (checked) {
+      setSelectedStaffIds(prev => [...prev, staffId]);
+    } else {
+      setSelectedStaffIds(prev => prev.filter(id => id !== staffId));
+    }
+  };
+
+  const bulkDeactivateStaff = async () => {
+    try {
+      setFormLoading(true);
+      const promises = selectedStaffIds.map(id => staffAPI.delete(id));
+      await Promise.all(promises);
+      
+      setStaff(prev => prev.filter(member => !selectedStaffIds.includes(member._id)));
+      setSelectedStaffIds([]);
+      setShowBulkActionsModal(false);
+      showToast(`${selectedStaffIds.length} staff members deactivated successfully!`);
+    } catch (err) {
+      console.error('Error deactivating staff:', err);
+      showToast('Failed to deactivate some staff members', 'error');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const bulkExportSelected = () => {
+    const selectedStaff = filteredStaff.filter(member => selectedStaffIds.includes(member._id));
+    const csvContent = generateCSV(selectedStaff);
+    downloadFile(csvContent, `selected-staff-${selectedStaff.length}.csv`, 'text/csv');
+    showToast(`${selectedStaff.length} staff members exported successfully!`);
+    setShowBulkActionsModal(false);
   };
 
   if (loading) {
@@ -256,13 +474,22 @@ const StaffPage = () => {
             >
               👤 Add Staff Member
             </button>
-            <button className="action-btn">
+            <button 
+              className="action-btn"
+              onClick={() => setShowExportModal(true)}
+            >
               📤 Export Staff List
             </button>
-            <button className="action-btn">
+            <button 
+              className="action-btn"
+              onClick={() => setShowReportsModal(true)}
+            >
               📊 View Reports
             </button>
-            <button className="action-btn">
+            <button 
+              className="action-btn"
+              onClick={() => setShowBulkActionsModal(true)}
+            >
               ⚙️ Bulk Actions
             </button>
           </div>
@@ -302,6 +529,14 @@ const StaffPage = () => {
             <table className="table">
               <thead>
                 <tr>
+                  <th>
+                    <input
+                      type="checkbox"
+                      checked={selectedStaffIds.length === filteredStaff.length && filteredStaff.length > 0}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      className="bulk-checkbox"
+                    />
+                  </th>
                   <th>Name</th>
                   <th>Role</th>
                   <th>Contact</th>
@@ -315,6 +550,14 @@ const StaffPage = () => {
                 {filteredStaff.map((member) => (
                   <tr key={member._id}>
                     <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedStaffIds.includes(member._id)}
+                        onChange={(e) => handleSelectStaff(member._id, e.target.checked)}
+                        className="bulk-checkbox"
+                      />
+                    </td>
+                    <td>
                       <div className="staff-info">
                         <div className="staff-name">{member.name}</div>
                         <div className="staff-email">{member.email}</div>
@@ -327,7 +570,7 @@ const StaffPage = () => {
                     </td>
                     <td>
                       <div className="contact-info">
-                        <div>{member.phone}</div>
+                        <div>{formatPhoneForDisplay(member.phone)}</div>
                       </div>
                     </td>
                     <td>
@@ -406,6 +649,248 @@ const StaffPage = () => {
         confirmText="Remove"
         type="danger"
       />
+
+      {/* Export Modal */}
+      <Modal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        title="Export Staff List"
+        size="medium"
+      >
+        <div className="export-modal">
+          <div className="export-info">
+            <h4>Export Current View</h4>
+            <p>Export {filteredStaff.length} staff member{filteredStaff.length !== 1 ? 's' : ''} currently shown in the table.</p>
+            
+            {searchTerm && (
+              <p className="filter-info">
+                <strong>Search:</strong> "{searchTerm}"
+              </p>
+            )}
+            {roleFilter !== 'all' && (
+              <p className="filter-info">
+                <strong>Role Filter:</strong> {formatRoleForDisplay(roleFilter)}
+              </p>
+            )}
+          </div>
+
+          <div className="export-options">
+            <div className="export-format">
+              <button 
+                className="btn btn-outline export-btn"
+                onClick={() => {
+                  exportStaffToCSV();
+                  setShowExportModal(false);
+                }}
+              >
+                📊 Export as CSV
+                <small>For spreadsheet applications (Excel, Google Sheets)</small>
+              </button>
+
+              <button 
+                className="btn btn-outline export-btn"
+                onClick={() => {
+                  exportStaffToJSON();
+                  setShowExportModal(false);
+                }}
+              >
+                🗂️ Export as JSON
+                <small>For data import/backup purposes</small>
+              </button>
+            </div>
+          </div>
+
+          <div className="export-actions">
+            <button 
+              className="btn btn-outline"
+              onClick={() => setShowExportModal(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Reports Modal */}
+      <Modal
+        isOpen={showReportsModal}
+        onClose={() => setShowReportsModal(false)}
+        title="Staff Reports & Analytics"
+        size="large"
+      >
+        <div className="reports-modal">
+          {(() => {
+            const reports = getReportsData();
+            const stats = getRoleStats();
+            
+            return (
+              <>
+                {/* Quick Stats */}
+                <div className="reports-section">
+                  <h4>📊 Quick Statistics</h4>
+                  <div className="quick-stats-grid">
+                    <div className="stat-card">
+                      <div className="stat-number">{reports.totalActive}</div>
+                      <div className="stat-label">Active Staff</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-number">£{reports.totalWeeklyCost.toFixed(0)}</div>
+                      <div className="stat-label">Weekly Cost</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-number">£{reports.avgHourlyRate.toFixed(2)}</div>
+                      <div className="stat-label">Avg Hourly Rate</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-number">{Math.max(...Object.values(reports.availabilityByDay))}</div>
+                      <div className="stat-label">Peak Day Coverage</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Role Breakdown */}
+                <div className="reports-section">
+                  <h4>👥 Staff by Role</h4>
+                  <div className="role-breakdown">
+                    {Object.entries(reports.roleBreakdown)
+                      .filter(([role, count]) => count > 0)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([role, count]) => (
+                        <div key={role} className="role-bar">
+                          <div className="role-info">
+                            <span className="role-name">{formatRoleForDisplay(role)}</span>
+                            <span className="role-count">{count} staff</span>
+                          </div>
+                          <div className="role-visual">
+                            <div 
+                              className="role-fill" 
+                              style={{ width: `${(count / reports.totalActive) * 100}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Availability Heatmap */}
+                <div className="reports-section">
+                  <h4>📅 Availability by Day</h4>
+                  <div className="availability-grid">
+                    {Object.entries(reports.availabilityByDay).map(([day, count]) => (
+                      <div key={day} className="day-availability">
+                        <div className="day-name">{day.charAt(0).toUpperCase() + day.slice(1).slice(0, 3)}</div>
+                        <div className="day-count">{count}</div>
+                        <div className="day-bar">
+                          <div 
+                            className="day-fill"
+                            style={{ height: `${(count / Math.max(...Object.values(reports.availabilityByDay))) * 100}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Compliance Alerts */}
+                {(reports.lowPaidStaff > 0 || reports.overworkedStaff > 0) && (
+                  <div className="reports-section">
+                    <h4>⚠️ Compliance Alerts</h4>
+                    <div className="compliance-alerts">
+                      {reports.lowPaidStaff > 0 && (
+                        <div className="alert alert-warning">
+                          <strong>{reports.lowPaidStaff}</strong> staff member{reports.lowPaidStaff !== 1 ? 's' : ''} below minimum wage (£10.50/hr)
+                        </div>
+                      )}
+                      {reports.overworkedStaff > 0 && (
+                        <div className="alert alert-info">
+                          <strong>{reports.overworkedStaff}</strong> staff member{reports.overworkedStaff !== 1 ? 's' : ''} working over 48 hours/week
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+          
+          <div className="reports-actions">
+            <button 
+              className="btn btn-outline"
+              onClick={() => setShowReportsModal(false)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Bulk Actions Modal */}
+      <Modal
+        isOpen={showBulkActionsModal}
+        onClose={() => setShowBulkActionsModal(false)}
+        title="Bulk Actions"
+        size="medium"
+      >
+        <div className="bulk-actions-modal">
+          <div className="bulk-info">
+            <h4>Selected Staff Members</h4>
+            <p>{selectedStaffIds.length} staff member{selectedStaffIds.length !== 1 ? 's' : ''} selected</p>
+            
+            {selectedStaffIds.length === 0 && (
+              <div className="no-selection">
+                <p>ℹ️ No staff members selected. Use the checkboxes in the staff table to select members for bulk actions.</p>
+              </div>
+            )}
+          </div>
+
+          {selectedStaffIds.length > 0 && (
+            <div className="bulk-options">
+              <div className="bulk-actions-grid">
+                <button 
+                  className="bulk-action-btn export-btn"
+                  onClick={bulkExportSelected}
+                >
+                  📤 Export Selected
+                  <small>Export {selectedStaffIds.length} selected staff to CSV</small>
+                </button>
+
+                <button 
+                  className="bulk-action-btn deactivate-btn"
+                  onClick={bulkDeactivateStaff}
+                  disabled={formLoading}
+                >
+                  🚫 Deactivate Selected
+                  <small>Remove {selectedStaffIds.length} staff member{selectedStaffIds.length !== 1 ? 's' : ''} from active roster</small>
+                </button>
+              </div>
+              
+              <div className="bulk-warning">
+                <p><strong>⚠️ Warning:</strong> Deactivating staff members will remove them from the active roster. This action can be reversed by editing individual staff members later.</p>
+              </div>
+            </div>
+          )}
+
+          <div className="bulk-actions-footer">
+            <button 
+              className="btn btn-outline"
+              onClick={() => setShowBulkActionsModal(false)}
+            >
+              Close
+            </button>
+            {selectedStaffIds.length > 0 && (
+              <button 
+                className="btn btn-secondary"
+                onClick={() => {
+                  setSelectedStaffIds([]);
+                  showToast('Selection cleared');
+                }}
+              >
+                Clear Selection
+              </button>
+            )}
+          </div>
+        </div>
+      </Modal>
 
       <style jsx>{`
         .search-filters {
@@ -662,6 +1147,386 @@ const StaffPage = () => {
           
           .action-buttons {
             flex-direction: column;
+          }
+        }
+
+        /* Export Modal Styles */
+        .export-modal {
+          padding: 20px;
+        }
+
+        .export-info {
+          margin-bottom: 24px;
+          padding: 16px;
+          background: #f8f9fa;
+          border-radius: 8px;
+          border-left: 4px solid #3b82f6;
+        }
+
+        .export-info h4 {
+          margin: 0 0 8px 0;
+          color: #1f2937;
+          font-size: 16px;
+        }
+
+        .export-info p {
+          margin: 4px 0;
+          color: #6b7280;
+          font-size: 14px;
+        }
+
+        .filter-info {
+          font-size: 13px !important;
+          color: #374151 !important;
+          background: #e5e7eb;
+          padding: 4px 8px;
+          border-radius: 4px;
+          display: inline-block;
+          margin: 2px 4px 2px 0;
+        }
+
+        .export-options {
+          margin-bottom: 24px;
+        }
+
+        .export-format {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .export-btn {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          padding: 16px 20px;
+          text-align: left;
+          border-radius: 8px;
+          transition: all 0.2s ease;
+        }
+
+        .export-btn small {
+          font-size: 12px;
+          color: white;
+          margin-top: 4px;
+          font-weight: normal;
+          opacity: 0.8;
+        }
+
+        .export-btn:hover small {
+          opacity: 1;
+        }
+
+        .export-btn:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .export-actions {
+          display: flex;
+          justify-content: flex-end;
+          padding-top: 16px;
+          border-top: 1px solid #e5e7eb;
+        }
+
+        /* Reports Modal Styles */
+        .reports-modal {
+          padding: 20px;
+          max-height: 600px;
+          overflow-y: auto;
+        }
+
+        .reports-section {
+          margin-bottom: 32px;
+          padding-bottom: 24px;
+          border-bottom: 1px solid #f3f4f6;
+        }
+
+        .reports-section:last-of-type {
+          border-bottom: none;
+        }
+
+        .reports-section h4 {
+          margin: 0 0 16px 0;
+          color: #1f2937;
+          font-size: 16px;
+          font-weight: 600;
+        }
+
+        .quick-stats-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+          gap: 16px;
+        }
+
+        .stat-card {
+          background: #f8f9fa;
+          padding: 16px;
+          border-radius: 8px;
+          text-align: center;
+          border: 1px solid #e5e7eb;
+        }
+
+        .stat-number {
+          font-size: 24px;
+          font-weight: 700;
+          color: #3b82f6;
+          margin-bottom: 4px;
+        }
+
+        .stat-label {
+          font-size: 12px;
+          color: #6b7280;
+          font-weight: 500;
+        }
+
+        .role-breakdown {
+          space: 12px;
+        }
+
+        .role-bar {
+          margin-bottom: 12px;
+        }
+
+        .role-info {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 4px;
+          font-size: 14px;
+        }
+
+        .role-name {
+          font-weight: 500;
+          color: #374151;
+        }
+
+        .role-count {
+          color: #6b7280;
+          font-size: 13px;
+        }
+
+        .role-visual {
+          height: 8px;
+          background: #e5e7eb;
+          border-radius: 4px;
+          overflow: hidden;
+        }
+
+        .role-fill {
+          height: 100%;
+          background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+          transition: width 0.3s ease;
+        }
+
+        .availability-grid {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          gap: 12px;
+        }
+
+        .day-availability {
+          text-align: center;
+        }
+
+        .day-name {
+          font-size: 12px;
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 4px;
+        }
+
+        .day-count {
+          font-size: 18px;
+          font-weight: 700;
+          color: #3b82f6;
+          margin-bottom: 8px;
+        }
+
+        .day-bar {
+          height: 40px;
+          background: #f3f4f6;
+          border-radius: 4px;
+          display: flex;
+          align-items: end;
+          overflow: hidden;
+        }
+
+        .day-fill {
+          width: 100%;
+          background: linear-gradient(180deg, #3b82f6, #1d4ed8);
+          border-radius: 2px;
+          transition: height 0.3s ease;
+        }
+
+        .compliance-alerts {
+          space: 12px;
+        }
+
+        .alert {
+          padding: 12px 16px;
+          border-radius: 6px;
+          font-size: 14px;
+          margin-bottom: 8px;
+        }
+
+        .alert-warning {
+          background: #fef3c7;
+          border: 1px solid #f59e0b;
+          color: #92400e;
+        }
+
+        .alert-info {
+          background: #dbeafe;
+          border: 1px solid #3b82f6;
+          color: #1e40af;
+        }
+
+        .reports-actions {
+          display: flex;
+          justify-content: flex-end;
+          padding-top: 16px;
+          border-top: 1px solid #e5e7eb;
+          margin-top: 24px;
+        }
+
+        /* Bulk Actions Styles */
+        .bulk-checkbox {
+          width: 16px;
+          height: 16px;
+          cursor: pointer;
+        }
+
+        .bulk-actions-modal {
+          padding: 20px;
+        }
+
+        .bulk-info {
+          margin-bottom: 24px;
+          padding: 16px;
+          background: #f8f9fa;
+          border-radius: 8px;
+          border-left: 4px solid #3b82f6;
+        }
+
+        .bulk-info h4 {
+          margin: 0 0 8px 0;
+          color: #1f2937;
+          font-size: 16px;
+        }
+
+        .bulk-info p {
+          margin: 4px 0;
+          color: #6b7280;
+          font-size: 14px;
+        }
+
+        .no-selection {
+          background: #fef3c7;
+          border: 1px solid #f59e0b;
+          border-radius: 6px;
+          padding: 12px;
+          margin-top: 12px;
+        }
+
+        .no-selection p {
+          color: #92400e !important;
+          margin: 0 !important;
+          font-size: 13px;
+        }
+
+        .bulk-options {
+          margin-bottom: 24px;
+        }
+
+        .bulk-actions-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+          margin-bottom: 16px;
+        }
+
+        .bulk-action-btn {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          padding: 16px 20px;
+          text-align: left;
+          border-radius: 8px;
+          border: 2px solid;
+          background: white;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .bulk-action-btn:hover:not(:disabled) {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .bulk-action-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .bulk-action-btn small {
+          font-size: 12px;
+          color: #6b7280;
+          margin-top: 4px;
+          font-weight: normal;
+        }
+
+        .export-btn {
+          border-color: #3b82f6;
+          color: #3b82f6;
+        }
+
+        .export-btn:hover {
+          background: #3b82f6;
+          color: white;
+        }
+
+        .export-btn:hover small {
+          color: white;
+        }
+
+        .deactivate-btn {
+          border-color: #ef4444;
+          color: #ef4444;
+        }
+
+        .deactivate-btn:hover {
+          background: #ef4444;
+          color: white;
+        }
+
+        .deactivate-btn:hover small {
+          color: white;
+        }
+
+        .bulk-warning {
+          background: #fef2f2;
+          border: 1px solid #fecaca;
+          border-radius: 6px;
+          padding: 12px;
+        }
+
+        .bulk-warning p {
+          margin: 0;
+          font-size: 13px;
+          color: #dc2626;
+        }
+
+        .bulk-actions-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding-top: 16px;
+          border-top: 1px solid #e5e7eb;
+        }
+
+        @media (max-width: 768px) {
+          .bulk-actions-grid {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>

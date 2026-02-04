@@ -118,6 +118,20 @@
   font-size: 12px;
   font-weight: 500;
   margin-top: 4px;
+  display: block;
+}
+
+/* Warning messages */
+.warning-message {
+  color: #f39c12;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 4px;
+  display: block;
+  background: #fef8e7;
+  padding: 8px 12px;
+  border-radius: 4px;
+  border-left: 3px solid #f39c12;
 }
 
 /* Duration display */
@@ -159,11 +173,24 @@
   margin-top: 8px;
 }
 
+.role-selector.multi-select {
+  border: 2px solid #dee2e6;
+  border-radius: 12px;
+  padding: 16px;
+  background: #f8f9fa;
+}
+
+.role-selector.multi-select.error {
+  border-color: #e74c3c;
+  background: #fdf2f2;
+}
+
 .role-option {
   cursor: pointer;
 }
 
-.role-option input[type="radio"] {
+.role-option input[type="radio"],
+.role-option input[type="checkbox"] {
   display: none;
 }
 
@@ -174,12 +201,20 @@
   text-align: center;
   transition: all 0.2s ease;
   background: white;
+  position: relative;
 }
 
-.role-option input[type="radio"]:checked + .role-card {
+.role-option input[type="radio"]:checked + .role-card,
+.role-option input[type="checkbox"]:checked + .role-card {
   border-color: currentColor;
   background-color: rgba(52, 152, 219, 0.05);
   transform: scale(1.02);
+}
+
+.role-card.selected {
+  border-color: #3498db;
+  background-color: rgba(52, 152, 219, 0.1);
+  box-shadow: 0 2px 8px rgba(52, 152, 219, 0.2);
 }
 
 .role-option:hover .role-card {
@@ -192,6 +227,141 @@
   font-weight: 600;
   display: block;
   line-height: 1.2;
+}
+
+.role-check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: #3498db;
+  color: white;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.role-count {
+  font-weight: 400;
+  color: #3498db;
+  font-size: 12px;
+}
+
+/* Role Requirements Grid */
+.role-requirements-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+  border: 2px solid #dee2e6;
+  border-radius: 12px;
+  padding: 16px;
+  background: #f8f9fa;
+}
+
+.role-requirements-grid.error {
+  border-color: #e74c3c;
+  background: #fdf2f2;
+}
+
+.role-requirement-item {
+  background: white;
+  border: 2px solid #dee2e6;
+  border-radius: 8px;
+  padding: 12px;
+  transition: all 0.2s ease;
+}
+
+.role-requirement-item.selected {
+  border-color: #3498db;
+  background-color: rgba(52, 152, 219, 0.05);
+  box-shadow: 0 2px 8px rgba(52, 152, 219, 0.2);
+}
+
+.role-checkbox {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.role-checkbox input[type="checkbox"] {
+  margin-right: 8px;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  accent-color: #3498db;
+}
+
+.role-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+  border-left: 3px solid #dee2e6;
+  padding-left: 8px;
+  flex: 1;
+}
+
+.role-requirement-item.selected .role-name {
+  color: #3498db;
+}
+
+.role-count-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  justify-content: center;
+}
+
+.count-btn {
+  width: 32px;
+  height: 32px;
+  border: 2px solid #3498db;
+  background: white;
+  color: #3498db;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.count-btn:hover:not(:disabled) {
+  background: #3498db;
+  color: white;
+  transform: scale(1.05);
+}
+
+.count-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.count-input {
+  width: 60px;
+  height: 32px;
+  text-align: center;
+  border: 2px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+  padding: 0;
+}
+
+.count-input:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
 }
 
 /* Checkbox styling */

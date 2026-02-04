@@ -225,7 +225,7 @@ const ShiftTemplatesPage = () => {
         editingTemplate={editingTemplate}
       />
 
-      <style jsx>{`
+      <style>{`
         .container {
           max-width: 1400px;
           margin: 0 auto;

@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const { STAFF_ROLES, DAYS_OF_WEEK, CONSTRAINTS, PATTERNS } = require('./constants');
 
+console.log('🚀 LOADING ShiftTemplate.js - Version 3.0 - ' + new Date().toISOString());
+
 /**
  * Shift Template Model - Reusable Shift Patterns
  * 
@@ -42,20 +44,22 @@ const shiftTemplateSchema = new mongoose.Schema({
       message: 'End time must be in HH:MM format (24-hour)'
     }
   },
-  requiredRole: {
-    type: String,
-    required: [true, 'Required role is required'],
-    enum: {
-      values: STAFF_ROLES,
-      message: 'Role must be one of: {VALUES}'
+  roleRequirements: [{
+    role: {
+      type: String,
+      required: true,
+      enum: {
+        values: STAFF_ROLES,
+        message: 'Role must be one of: {VALUES}'
+      }
+    },
+    count: {
+      type: Number,
+      required: true,
+      min: [1, 'Role count must be at least 1'],
+      max: [CONSTRAINTS.MAX_STAFF_PER_SHIFT, `Role count cannot exceed ${CONSTRAINTS.MAX_STAFF_PER_SHIFT}`]
     }
-  },
-  staffCount: {
-    type: Number,
-    required: [true, 'Staff count is required'],
-    min: [CONSTRAINTS.MIN_STAFF_PER_SHIFT, `At least ${CONSTRAINTS.MIN_STAFF_PER_SHIFT} staff member required`],
-    max: [CONSTRAINTS.MAX_STAFF_PER_SHIFT, `Cannot exceed ${CONSTRAINTS.MAX_STAFF_PER_SHIFT} staff members`]
-  },
+  }],
   isActive: {
     type: Boolean,
     default: true
@@ -75,11 +79,44 @@ const shiftTemplateSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Custom validation to ensure at least one role is selected
+shiftTemplateSchema.pre('validate', function() {
+  console.log('🔍 PRE-VALIDATE HOOK CALLED - Schema version 2.0 (no legacy fields)');
+  console.log('📊 Role requirements:', JSON.stringify(this.roleRequirements));
+  
+  // Handle backward compatibility - convert old formats to new
+  if ((!this.roleRequirements || this.roleRequirements.length === 0)) {
+    // Check for old format data (these fields not in schema anymore)
+    if (this.get('requiredRoles') && this.get('requiredRoles').length > 0) {
+      this.roleRequirements = this.get('requiredRoles').map(role => ({ role, count: 1 }));
+      console.log('📦 Converted from requiredRoles array');
+    } else if (this.get('requiredRole')) {
+      this.roleRequirements = [{ role: this.get('requiredRole'), count: this.get('staffCount') || 1 }];
+      console.log('📦 Converted from single requiredRole');
+    }
+  }
+  
+  // Ensure at least one role requirement is specified
+  if (!this.roleRequirements || this.roleRequirements.length === 0) {
+    this.invalidate('roleRequirements', 'At least one role requirement must be specified');
+  }
+  
+  // Calculate total staff count and store it as a dynamic property (not validated)
+  if (this.roleRequirements && this.roleRequirements.length > 0) {
+    const totalStaff = this.roleRequirements.reduce((sum, req) => sum + (req.count || 0), 0);
+    if (totalStaff === 0) {
+      this.invalidate('roleRequirements', 'Total staff count must be greater than 0');
+    } else {
+      // Store as non-schema property
+      this.set('staffCount', totalStaff, { strict: false });
+      console.log('✅ Calculated staffCount:', totalStaff);
+    }
+  }
+});
+
 // Database indexes for performance
 shiftTemplateSchema.index({ dayOfWeek: 1, isActive: 1 });
-shiftTemplateSchema.index({ requiredRole: 1, isActive: 1 });
 shiftTemplateSchema.index({ priority: -1 }); // Descending for high priority first
-shiftTemplateSchema.index({ dayOfWeek: 1, requiredRole: 1, isActive: 1 }); // Compound for rota generation
 
 // Virtual field - shift duration in hours
 shiftTemplateSchema.virtual('durationHours').get(function() {
@@ -99,7 +136,8 @@ shiftTemplateSchema.virtual('estimatedCost').get(function() {
   // This would need to be calculated with actual staff rates
   // Placeholder calculation with average rate
   const averageHourlyRate = 15; // £15/hour average
-  return this.durationHours * this.staffCount * averageHourlyRate;
+  const totalStaff = this.get('staffCount') || this.roleRequirements?.reduce((sum, req) => sum + (req.count || 0), 0) || 0;
+  return this.durationHours * totalStaff * averageHourlyRate;
 });
 
 // Pre-save validation
@@ -128,9 +166,17 @@ shiftTemplateSchema.statics.findForDay = function(dayOfWeek) {
 // Static method - find templates for role
 shiftTemplateSchema.statics.findForRole = function(role) {
   return this.find({
-    requiredRole: role,
+    'roleRequirements.role': role,
     isActive: true
   }).sort({ dayOfWeek: 1, startTime: 1 });
 };
 
-module.exports = mongoose.model('ShiftTemplate', shiftTemplateSchema);
+// NUCLEAR OPTION: Clear all cached references
+delete mongoose.models.ShiftTemplate;
+delete mongoose.connection.models.ShiftTemplate;
+
+// Clear the compiled schema cache by recreating with a clean schema object
+const cleanSchema = shiftTemplateSchema.clone();
+
+console.log('📝 Creating COMPLETELY NEW ShiftTemplate model from cloned schema...');
+module.exports = mongoose.model('ShiftTemplate', cleanSchema);

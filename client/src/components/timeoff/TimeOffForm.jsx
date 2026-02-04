@@ -43,13 +43,17 @@ const TimeOffForm = ({
   // Set form data when editing
   useEffect(() => {
     if (editingRequest) {
+      // Split notes to extract reason and additional notes
+      const notes = editingRequest.notes || '';
+      const noteParts = notes.split('\n\nAdditional notes: ');
+      
       setFormData({
         staffId: editingRequest.staffId._id || editingRequest.staffId,
-        type: editingRequest.type,
+        type: editingRequest.reason || 'holiday', // Backend reason -> frontend type
         startDate: formatDateForInput(editingRequest.startDate),
         endDate: formatDateForInput(editingRequest.endDate),
-        reason: editingRequest.reason || '',
-        notes: editingRequest.notes || ''
+        reason: noteParts[0] || '', // Main reason text
+        notes: noteParts[1] || '' // Additional notes if any
       });
     } else {
       resetForm();
@@ -134,9 +138,23 @@ const TimeOffForm = ({
     }
 
     const requestData = {
-      ...formData,
-      status: editingRequest ? editingRequest.status : 'pending'
+      staffId: formData.staffId,
+      startDate: new Date(formData.startDate + 'T00:00:00').toISOString(), // Convert to ISO format
+      endDate: new Date(formData.endDate + 'T00:00:00').toISOString(), // Convert to ISO format
+      reason: formData.type, // Map frontend type to backend reason enum
     };
+
+    // Only add notes if there's content
+    const reasonText = formData.reason?.trim() || '';
+    const notesText = formData.notes?.trim() || '';
+    if (reasonText || notesText) {
+      requestData.notes = reasonText + (notesText ? ('\n\nAdditional notes: ' + notesText) : '');
+    }
+
+    // Only add status for updates, not creates
+    if (editingRequest) {
+      requestData.status = editingRequest.status;
+    }
 
     try {
       if (editingRequest) {
@@ -231,7 +249,7 @@ const TimeOffForm = ({
                   <option value="holiday">🏖️ Holiday</option>
                   <option value="sick">🤒 Sick Leave</option>
                   <option value="personal">👤 Personal</option>
-                  <option value="emergency">🚨 Emergency</option>
+                  <option value="family_emergency">🚨 Family Emergency</option>
                   <option value="other">📋 Other</option>
                 </select>
               </div>
