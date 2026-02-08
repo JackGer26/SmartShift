@@ -108,7 +108,7 @@ const staffSchema = new mongoose.Schema({
   }],
   timePreference: {
     type: String,
-    enum: ['early', 'late', 'night', 'flexible'],
+    enum: ['early', 'late', 'flexible'],
     default: 'flexible'
   },
   weekendPreference: {

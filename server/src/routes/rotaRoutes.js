@@ -3,6 +3,8 @@ const {
   getAllRotaWeeks,
   getRotaWeekById,
   generateRotaWeek,
+  generateRotaWeekV2,
+  previewRotaWeekV2,
   updateRotaWeek,
   deleteRotaWeek,
   publishRotaWeek,
@@ -36,6 +38,14 @@ router.get('/', getAllRotaWeeks);
 
 // POST /api/rota/generate - Generate new rota week with advanced algorithm
 router.post('/generate', validateGenerateRota, generateRotaWeek);
+
+// POST /api/rota/generate-v2 - Generate rota with V2 production-grade algorithm
+// Body: { weekStartDate: "YYYY-MM-DD", saveToDatabase: true }
+router.post('/generate-v2', validateGenerateRota, generateRotaWeekV2);
+
+// POST /api/rota/preview-v2 - Preview rota with V2 algorithm (no database save)
+// Body: { weekStartDate: "YYYY-MM-DD" }
+router.post('/preview-v2', validateGenerateRota, previewRotaWeekV2);
 
 // GET /api/rota/week/:date - Get rota for specific week (YYYY-MM-DD format)
 router.get('/week/:date', validateWeekDate, getRotaWeekByDate);

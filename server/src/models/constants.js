@@ -33,6 +33,16 @@ const DAYS_OF_WEEK = [
   'sunday'
 ];
 
+// Shift types - for hospitality staffing patterns
+const SHIFT_TYPES = [
+  'opening',   // Morning shift - 1-3 staff, requires manager/assistant_manager
+  'peak',      // Busy period - full staffing levels
+  'closing'    // Evening shift - 3-4 staff, requires manager/assistant_manager
+];
+
+// Manager roles - for opening/closing shift requirements
+const MANAGER_ROLES = ['manager', 'assistant_manager'];
+
 // Time off request types
 const TIME_OFF_TYPES = [
   'holiday',           // Planned vacation time
@@ -87,6 +97,8 @@ const PATTERNS = {
 module.exports = {
   STAFF_ROLES,
   DAYS_OF_WEEK,
+  SHIFT_TYPES,
+  MANAGER_ROLES,
   TIME_OFF_TYPES,
   TIME_OFF_STATUSES,
   SHIFT_STATUSES,

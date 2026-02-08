@@ -1,6 +1,6 @@
 const RotaWeek = require('../models/RotaWeek');
 const Staff = require('../models/Staff');
-const rotaGenerationService = require('../services/rotaGenerationService');
+// const rotaGenerationService = require('../services/rotaGenerationService'); // V1 service - replaced by V2
 const HardConstraintValidator = require('../utils/hardConstraintValidator');
 const asyncHandler = require('../utils/asyncHandler');
 const { NotFoundError, ValidationError } = require('../utils/errors');
@@ -693,6 +693,8 @@ const generateDailyBreakdown = (rota) => {
 const transformRotaForFrontend = (rota) => {
   const rotaObj = rota.toObject ? rota.toObject() : rota;
   
+  console.log(`🔄 Transforming rota for frontend: ${rotaObj.shifts.length} shifts`);
+  
   // Group shifts by date + template + time
   const shiftMap = new Map();
   
@@ -717,19 +719,27 @@ const transformRotaForFrontend = (rota) => {
     // Add staff to assignedStaff array if staff is assigned
     if (shift.staffId) {
       const shiftGroup = shiftMap.get(key);
-      shiftGroup.assignedStaff.push({
+      const staffData = {
         id: shift.staffId._id || shift.staffId,
         firstName: shift.staffId.firstName || shift.staffId.name?.split(' ')[0] || '',
         lastName: shift.staffId.lastName || shift.staffId.name?.split(' ')[1] || '',
         name: shift.staffId.name,
         role: shift.staffId.role,
-        hourlyRate: shift.staffId.hourlyRate
-      });
+        hourlyRate: shift.staffId.hourlyRate,
+        // Include individual shift times (for V2 rota generator)
+        start: shift.startTime,
+        end: shift.endTime,
+        hours: calculateShiftDuration(shift.startTime, shift.endTime)
+      };
+      console.log(`  Adding ${staffData.name}: ${staffData.start} - ${staffData.end} (${staffData.hours}h)`);
+      shiftGroup.assignedStaff.push(staffData);
     }
   });
   
   // Convert map to array
   const groupedShifts = Array.from(shiftMap.values());
+  
+  console.log(`✅ Transformed to ${groupedShifts.length} grouped shifts with individual staff times`);
   
   return {
     _id: rotaObj._id,
@@ -1070,11 +1080,248 @@ const shiftsOverlap = (start1, end1, start2, end2) => {
   return start1Minutes < end2Minutes && start2Minutes < end1Minutes;
 };
 
+// ============================================================================
+// V2 ROTA GENERATOR - Production-Grade Algorithm
+// ============================================================================
+
+const ShiftTemplate = require('../models/ShiftTemplate');
+const TimeOff = require('../models/TimeOff');
+
+// @desc    Generate rota using V2 algorithm (production-grade)
+// @route   POST /api/rota/generate-v2
+// @access  Public
+const generateRotaWeekV2 = asyncHandler(async (req, res) => {
+  const { 
+    weekStartDate,
+    saveToDatabase = true
+  } = req.body;
+
+  if (!weekStartDate) {
+    return res.status(400).json({
+      success: false,
+      error: 'Week start date is required'
+    });
+  }
+
+  // Import the V2 generator
+  const { generateWeeklyRota } = require('../services/rotaGeneratorV2');
+  
+  // Normalize to Monday
+  const mondayDate = getWeekStart(new Date(weekStartDate));
+  const sundayDate = new Date(mondayDate);
+  sundayDate.setDate(sundayDate.getDate() + 6);
+
+  // Check if rota already exists for this week
+  const existingRota = await RotaWeek.findOne({ weekStartDate: mondayDate });
+  if (existingRota) {
+    return res.status(400).json({
+      success: false,
+      error: `Rota already exists for week starting ${mondayDate.toISOString().split('T')[0]}. Delete the existing rota first or use a different week.`
+    });
+  }
+
+  // Gather all required data
+  const [shiftTemplates, staff, timeOffRequests] = await Promise.all([
+    ShiftTemplate.find({ isActive: true }).sort({ priority: -1, startTime: 1 }),
+    Staff.find({ isActive: true }).sort({ name: 1 }),
+    TimeOff.find({
+      status: 'approved',
+      $or: [
+        { startDate: { $lte: sundayDate }, endDate: { $gte: mondayDate } }
+      ]
+    }).populate('staffId')
+  ]);
+
+  // Validate we have required data
+  if (shiftTemplates.length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: 'No active shift templates found. Create shift templates before generating a rota.'
+    });
+  }
+
+  if (staff.length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: 'No active staff members found. Add staff before generating a rota.'
+    });
+  }
+
+  // Generate the rota using V2 algorithm
+  let result;
+  try {
+    console.log('🎯 Controller: Calling V2 generator...');
+    result = generateWeeklyRota({
+      weekStartDate: mondayDate,
+      shiftTemplates,
+      staff,
+      timeOffRequests
+    });
+    console.log('✅ Controller: V2 generator returned successfully');
+  } catch (generatorError) {
+    console.error('❌ Controller: V2 generator failed:', generatorError.message);
+    return res.status(500).json({
+      success: false,
+      error: `Rota generation failed: ${generatorError.message}`,
+      details: generatorError.stack
+    });
+  }
+
+  // Calculate totals for storage
+  let totalStaffHours = 0;
+  let totalLaborCost = 0;
+
+  // Transform V2 output to database format if saving
+  let savedRota = null;
+  
+  if (saveToDatabase) {
+    // Convert V2 assignments to database shifts format
+    const dbShifts = [];
+    
+    console.log('📊 Converting V2 assignments to database format...');
+    
+    for (const day of result.days) {
+      console.log(`  Day ${day.dayName}: ${day.assignments.length} assignments`);
+      
+      for (const assignment of day.assignments) {
+        if (assignment.staffId) {
+          console.log(`    - ${assignment.staffName}: ${assignment.start} - ${assignment.end} (${assignment.hours}h)`);
+          
+          // Find the template that matches this assignment
+          const matchingTemplate = shiftTemplates.find(t => {
+            const dayName = getDayName(new Date(day.date)).toLowerCase();
+            return t.dayOfWeek === dayName;
+          });
+
+          const shiftHours = assignment.hours || 0;
+          totalStaffHours += shiftHours;
+          
+          // Find staff hourly rate
+          const staffMember = staff.find(s => s._id.toString() === assignment.staffId.toString());
+          if (staffMember) {
+            totalLaborCost += shiftHours * staffMember.hourlyRate;
+          }
+
+          dbShifts.push({
+            staffId: assignment.staffId,
+            shiftTemplateId: matchingTemplate?._id,
+            date: new Date(day.date),
+            startTime: assignment.start,
+            endTime: assignment.end,
+            status: 'scheduled',
+            role: assignment.role,
+            notes: assignment.warnings?.length > 0 
+              ? assignment.warnings.map(w => w.message).join('; ')
+              : undefined
+          });
+        }
+      }
+    }
+    
+    console.log(`✅ Created ${dbShifts.length} database shifts`);
+    console.log(`📊 Total hours: ${totalStaffHours}, Total cost: $${totalLaborCost}`);
+
+    // Save to database
+    savedRota = new RotaWeek({
+      weekStartDate: mondayDate,
+      weekEndDate: sundayDate,
+      shifts: dbShifts,
+      status: 'draft',
+      totalStaffHours: Math.round(totalStaffHours * 100) / 100,
+      totalLaborCost: Math.round(totalLaborCost * 100) / 100,
+      notes: `Generated using V2 algorithm on ${new Date().toISOString()}`
+    });
+
+    await savedRota.save();
+    await savedRota.populate('shifts.staffId shifts.shiftTemplateId');
+  }
+
+  // Build response
+  const responseData = savedRota ? transformRotaForFrontend(savedRota) : result;
+  
+  // Log sample of what's being sent
+  if (responseData.shifts && responseData.shifts.length > 0) {
+    console.log('\n📤 Sample shift being sent to frontend:');
+    const sampleShift = responseData.shifts[0];
+    console.log(`  Shift: ${sampleShift.startTime} - ${sampleShift.endTime}`);
+    console.log(`  Assigned staff: ${sampleShift.assignedStaff?.length || 0}`);
+    if (sampleShift.assignedStaff && sampleShift.assignedStaff.length > 0) {
+      const sampleStaff = sampleShift.assignedStaff[0];
+      console.log(`  Staff example: ${sampleStaff.name}`);
+      console.log(`    - Individual times: ${sampleStaff.start} - ${sampleStaff.end} (${sampleStaff.hours}h)`);
+    }
+  }
+  
+  const response = {
+    success: true,
+    data: responseData,
+    v2Result: result,
+    summary: result.summary,
+    globalWarnings: result.globalWarnings,
+    message: `Rota generated successfully with ${result.summary.totalAssignments} assignments`
+  };
+
+  res.status(201).json(response);
+});
+
+// @desc    Preview rota using V2 algorithm (without saving)
+// @route   POST /api/rota/preview-v2
+// @access  Public
+const previewRotaWeekV2 = asyncHandler(async (req, res) => {
+  const { weekStartDate } = req.body;
+
+  if (!weekStartDate) {
+    return res.status(400).json({
+      success: false,
+      error: 'Week start date is required'
+    });
+  }
+
+  // Import the V2 generator
+  const { generateWeeklyRota } = require('../services/rotaGeneratorV2');
+  
+  // Normalize to Monday
+  const mondayDate = getWeekStart(new Date(weekStartDate));
+  const sundayDate = new Date(mondayDate);
+  sundayDate.setDate(sundayDate.getDate() + 6);
+
+  // Gather all required data
+  const [shiftTemplates, staff, timeOffRequests] = await Promise.all([
+    ShiftTemplate.find({ isActive: true }).sort({ priority: -1, startTime: 1 }),
+    Staff.find({ isActive: true }).sort({ name: 1 }),
+    TimeOff.find({
+      status: 'approved',
+      $or: [
+        { startDate: { $lte: sundayDate }, endDate: { $gte: mondayDate } }
+      ]
+    }).populate('staffId')
+  ]);
+
+  // Generate preview (not saved)
+  const result = generateWeeklyRota({
+    weekStartDate: mondayDate,
+    shiftTemplates,
+    staff,
+    timeOffRequests
+  });
+
+  res.json({
+    success: true,
+    preview: true,
+    data: result,
+    summary: result.summary,
+    globalWarnings: result.globalWarnings,
+    message: 'Preview generated - not saved to database'
+  });
+});
+
 module.exports = {
   getAllRotaWeeks,
   getRotaWeekById,
   getRotaWeekByDate,
   generateRotaWeek,
+  generateRotaWeekV2,
+  previewRotaWeekV2,
   updateRotaWeek,
   publishRotaWeek,
   deleteRotaWeek,

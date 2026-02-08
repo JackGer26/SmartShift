@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { STAFF_ROLES, DAYS_OF_WEEK, CONSTRAINTS, PATTERNS } = require('./constants');
+const { STAFF_ROLES, DAYS_OF_WEEK, SHIFT_TYPES, CONSTRAINTS, PATTERNS } = require('./constants');
 
 console.log('🚀 LOADING ShiftTemplate.js - Version 3.0 - ' + new Date().toISOString());
 
@@ -69,6 +69,15 @@ const shiftTemplateSchema = new mongoose.Schema({
     default: 1,
     min: [CONSTRAINTS.SHIFT_PRIORITY_MIN, `Priority must be at least ${CONSTRAINTS.SHIFT_PRIORITY_MIN}`],
     max: [CONSTRAINTS.SHIFT_PRIORITY_MAX, `Priority cannot exceed ${CONSTRAINTS.SHIFT_PRIORITY_MAX}`]
+  },
+  shiftType: {
+    type: String,
+    enum: {
+      values: SHIFT_TYPES,
+      message: 'Shift type must be one of: {VALUES}'
+    },
+    default: 'peak',
+    required: false
   },
   description: {
     type: String,

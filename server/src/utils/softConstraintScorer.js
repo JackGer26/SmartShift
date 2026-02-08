@@ -265,9 +265,6 @@ class SoftConstraintScorer {
         case 'late': // 2 PM - 10 PM  
           score += startHour >= 14 && startHour <= 22 ? 15 : -5;
           break;
-        case 'night': // 6 PM onwards
-          score += startHour >= 18 ? 15 : -5;
-          break;
         case 'flexible': // No strong preference
           score += 5;
           break;
