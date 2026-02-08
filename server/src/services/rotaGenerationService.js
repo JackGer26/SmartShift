@@ -23,11 +23,22 @@ class RotaGenerationService {
    * Generate a comprehensive rota for a specific week
    * @param {Date} weekStartDate - Monday of the week to generate
    * @param {Object} options - Generation options
+   * @param {Array} options.templateIds - Optional array of template IDs to use (null = all)
+   * @param {Array} options.days - Optional array of day names to generate (null = all days)
+   * @param {Boolean} options.autoAssignStaff - Whether to auto-assign staff (default: true)
+   * @param {Boolean} options.useTemplates - Whether to use templates (default: true)
    * @returns {Promise<Object>} - Generated rota with analysis
    */
   async generateWeeklyRota(weekStartDate, options = {}) {
     const startTime = Date.now();
     this.log('🚀 Starting rota generation...');
+
+    const { 
+      templateIds = null, 
+      days = null, 
+      autoAssignStaff = true,
+      useTemplates = true 
+    } = options;
 
     try {
       // 1. Initialize week and validation
@@ -37,11 +48,11 @@ class RotaGenerationService {
       await this.validateWeekGeneration(mondayDate);
 
       // 2. Gather all required data
-      const context = await this.gatherSchedulingContext(mondayDate, sundayDate);
+      const context = await this.gatherSchedulingContext(mondayDate, sundayDate, { templateIds, days });
       this.log(`📊 Context: ${context.shiftTemplates.length} templates, ${context.staff.length} staff, ${context.timeOffRequests.length} time-off requests`);
 
       // 3. Expand shift templates into weekly shift instances
-      const shiftInstances = this.expandShiftTemplates(context.shiftTemplates, context.weekDates);
+      const shiftInstances = this.expandShiftTemplates(context.shiftTemplates, context.weekDates, { days });
       this.log(`🔄 Created ${shiftInstances.length} shift instances`);
 
       // 4. Create role slots per shift requirement
@@ -57,23 +68,39 @@ class RotaGenerationService {
         hourLimitIssues: []
       };
 
-      // 6. Assign staff to slots using sophisticated algorithm
-      for (const slot of roleSlots) {
-        const assignment = await this.assignStaffToSlot(
-          slot,
-          context,
-          staffHourTracker,
-          assignmentResults.assigned
-        );
-
-        if (assignment.success) {
-          assignmentResults.assigned.push(assignment.shift);
-          this.updateStaffHourTracker(staffHourTracker, assignment.shift);
-        } else {
-          assignmentResults.unfilled.push({
+      // 6. Assign staff to slots using sophisticated algorithm (if enabled)
+      if (autoAssignStaff) {
+        for (const slot of roleSlots) {
+          const assignment = await this.assignStaffToSlot(
             slot,
-            reason: assignment.reason,
-            availableStaff: assignment.availableStaff?.length || 0
+            context,
+            staffHourTracker,
+            assignmentResults.assigned
+          );
+
+          if (assignment.success) {
+            assignmentResults.assigned.push(assignment.shift);
+            this.updateStaffHourTracker(staffHourTracker, assignment.shift);
+          } else {
+            assignmentResults.unfilled.push({
+              slot,
+              reason: assignment.reason,
+              availableStaff: assignment.availableStaff?.length || 0
+            });
+          }
+        }
+      } else {
+        // Create empty shifts without staff assignment
+        for (const slot of roleSlots) {
+          assignmentResults.assigned.push({
+            shiftTemplateId: slot.templateId,
+            date: slot.date,
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            requiredRole: slot.requiredRole,
+            staffId: null,
+            duration: slot.shiftDuration,
+            status: 'unfilled'
           });
         }
       }
@@ -132,9 +159,20 @@ class RotaGenerationService {
   /**
    * Step 2: Gather all scheduling context
    */
-  async gatherSchedulingContext(mondayDate, sundayDate) {
+  async gatherSchedulingContext(mondayDate, sundayDate, filters = {}) {
+    const { templateIds = null, days = null } = filters;
+    
+    // Build template query
+    const templateQuery = { isActive: true };
+    if (templateIds && templateIds.length > 0) {
+      templateQuery._id = { $in: templateIds };
+    }
+    if (days && days.length > 0) {
+      templateQuery.dayOfWeek = { $in: days.map(d => d.toLowerCase()) };
+    }
+    
     const [shiftTemplates, staff, timeOffRequests] = await Promise.all([
-      ShiftTemplate.find({ isActive: true }).sort({ priority: -1, startTime: 1 }),
+      ShiftTemplate.find(templateQuery).sort({ priority: -1, startTime: 1 }),
       Staff.find({ isActive: true }).sort({ name: 1 }),
       TimeOff.find({
         status: 'approved',
@@ -156,31 +194,49 @@ class RotaGenerationService {
 
   /**
    * Step 3: Expand shift templates into weekly shift instances
+   * Now properly handles roleRequirements array instead of deprecated requiredRole
    */
-  expandShiftTemplates(shiftTemplates, weekDates) {
+  expandShiftTemplates(shiftTemplates, weekDates, filters = {}) {
+    const { days = null } = filters;
     const shiftInstances = [];
 
     for (const date of weekDates) {
       const dayName = getDayName(date);
+      
+      // Skip this day if not in the filter
+      if (days && days.length > 0 && !days.includes(dayName.toLowerCase())) {
+        continue;
+      }
+      
       const dayTemplates = shiftTemplates.filter(template => 
         template.dayOfWeek === dayName.toLowerCase()
       );
 
       for (const template of dayTemplates) {
-        shiftInstances.push({
-          id: `${template._id}_${date.toISOString().split('T')[0]}`,
-          templateId: template._id,
-          template: template,
-          date: date,
-          dayName: dayName.toLowerCase(),
-          startTime: template.startTime,
-          endTime: template.endTime,
-          requiredRole: template.requiredRole,
-          minStaff: template.minStaff || 1,
-          maxStaff: template.maxStaff || template.staffCount || 1,
-          priority: template.priority || 1,
-          shiftDuration: calculateShiftDuration(template.startTime, template.endTime)
-        });
+        // Expand roleRequirements into shift instances
+        const roleRequirements = template.roleRequirements || [];
+        
+        if (roleRequirements.length === 0) {
+          this.log(`⚠️ Template "${template.name}" has no role requirements, skipping`);
+          continue;
+        }
+
+        // Create a shift instance for each role requirement
+        for (const roleReq of roleRequirements) {
+          shiftInstances.push({
+            id: `${template._id}_${date.toISOString().split('T')[0]}_${roleReq.role}`,
+            templateId: template._id,
+            template: template,
+            date: date,
+            dayName: dayName.toLowerCase(),
+            startTime: template.startTime,
+            endTime: template.endTime,
+            requiredRole: roleReq.role,
+            staffCount: roleReq.count || 1,
+            priority: template.priority || 1,
+            shiftDuration: calculateShiftDuration(template.startTime, template.endTime)
+          });
+        }
       }
     }
 
@@ -193,12 +249,13 @@ class RotaGenerationService {
 
   /**
    * Step 4: Create role slots per shift requirement
+   * Creates individual slots based on staffCount from roleRequirements
    */
   createRoleSlots(shiftInstances) {
     const roleSlots = [];
 
     for (const shift of shiftInstances) {
-      const slotsNeeded = shift.maxStaff || 1;
+      const slotsNeeded = shift.staffCount || 1;
 
       for (let slotIndex = 0; slotIndex < slotsNeeded; slotIndex++) {
         roleSlots.push({

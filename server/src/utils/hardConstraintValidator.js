@@ -300,7 +300,9 @@ class HardConstraintValidator {
     const shiftDate = assignment.shiftDate.toDateString();
     
     const conflictingShifts = existingAssignments.filter(existing => {
-      return existing.staffId.toString() === staff._id.toString() &&
+      // Handle both populated (object with _id) and non-populated (ObjectId) staffId
+      const existingStaffId = existing.staffId._id ? existing.staffId._id.toString() : existing.staffId.toString();
+      return existingStaffId === staff._id.toString() &&
              existing.date.toDateString() === shiftDate &&
              this.shiftsOverlap(
                existing.startTime, existing.endTime,
@@ -432,7 +434,8 @@ class HardConstraintValidator {
     const staffShifts = {};
     shifts.forEach(shift => {
       if (!shift.staffId) return;
-      const staffId = shift.staffId.toString();
+      // Handle both populated (object with _id) and non-populated (ObjectId) staffId
+      const staffId = shift.staffId._id ? shift.staffId._id.toString() : shift.staffId.toString();
       if (!staffShifts[staffId]) staffShifts[staffId] = [];
       staffShifts[staffId].push(shift);
     });

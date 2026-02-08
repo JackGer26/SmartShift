@@ -682,9 +682,10 @@ const StaffPage = () => {
                   exportStaffToCSV();
                   setShowExportModal(false);
                 }}
+                style={{ color: 'white' }}
               >
                 📊 Export as CSV
-                <small>For spreadsheet applications (Excel, Google Sheets)</small>
+                <small style={{ color: 'white' }}>For spreadsheet applications (Excel, Google Sheets)</small>
               </button>
 
               <button 
@@ -693,9 +694,10 @@ const StaffPage = () => {
                   exportStaffToJSON();
                   setShowExportModal(false);
                 }}
+                style={{ color: 'white' }}
               >
                 🗂️ Export as JSON
-                <small>For data import/backup purposes</small>
+                <small style={{ color: 'white' }}>For data import/backup purposes</small>
               </button>
             </div>
           </div>

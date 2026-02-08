@@ -111,13 +111,11 @@ const getRotaWeekByDate = asyncHandler(async (req, res) => {
 
   // Add daily breakdown for better frontend consumption
   const dailyBreakdown = generateDailyBreakdown(rota);
+  const transformedRota = transformRotaForFrontend(rota);
 
   res.json({
     success: true,
-    data: {
-      ...rota.toObject(),
-      dailyBreakdown
-    }
+    data: transformedRota
   });
 });
 
@@ -126,7 +124,14 @@ const getRotaWeekByDate = asyncHandler(async (req, res) => {
 // @access  Public
 const generateRotaWeek = async (req, res, next) => {
   try {
-    const { weekStartDate, debug = false } = req.body;
+    const { 
+      weekStartDate, 
+      debug = false,
+      templateIds = null,
+      days = null,
+      autoAssignStaff = true,
+      useTemplates = true
+    } = req.body;
 
     if (!weekStartDate) {
       return res.status(400).json({
@@ -137,13 +142,24 @@ const generateRotaWeek = async (req, res, next) => {
 
     // Enable debug logging if requested
     const rotaGenerationService = require('../services/rotaGenerationService');
-    rotaGenerationService.debug = debug;
+    rotaGenerationService.debug = true; // Always enable for now
 
-    const result = await rotaGenerationService.generateWeeklyRota(new Date(weekStartDate));
+    const result = await rotaGenerationService.generateWeeklyRota(
+      new Date(weekStartDate), 
+      {
+        templateIds,
+        days,
+        autoAssignStaff,
+        useTemplates
+      }
+    );
+
+    // Transform data for frontend consumption
+    const transformedRota = transformRotaForFrontend(result.rota);
 
     res.status(201).json({
       success: true,
-      data: result.rota,
+      data: transformedRota,
       analysis: result.analysis,
       performance: result.performance,
       message: `Rota generated successfully - ${result.performance.fillRate}% fill rate`
@@ -277,7 +293,7 @@ const deleteRotaWeek = async (req, res, next) => {
       });
     }
 
-    await rota.remove();
+    await rota.deleteOne();
 
     res.json({
       success: true,
@@ -341,6 +357,70 @@ const getRotaStats = asyncHandler(async (req, res) => {
       status: rota.status,
       statistics: stats
     }
+  });
+});
+
+// @desc    Get staff hours summary for a rota
+// @route   GET /api/rota/:id/staff-hours
+// @access  Public
+const getStaffHours = asyncHandler(async (req, res) => {
+  const rota = await RotaWeek.findById(req.params.id)
+    .populate('shifts.staffId', 'name role hourlyRate maxHoursPerWeek contractedHours');
+
+  if (!rota) {
+    throw new NotFoundError('Rota not found');
+  }
+
+  // Calculate hours per staff member
+  const staffHoursMap = {};
+
+  for (const shift of rota.shifts) {
+    if (!shift.staffId) continue;
+
+    const staffId = shift.staffId._id.toString();
+    const duration = calculateShiftDuration(shift.startTime, shift.endTime);
+
+    if (!staffHoursMap[staffId]) {
+      staffHoursMap[staffId] = {
+        staffId: shift.staffId._id,
+        firstName: shift.staffId.name?.split(' ')[0] || shift.staffId.name,
+        lastName: shift.staffId.name?.split(' ').slice(1).join(' ') || '',
+        name: shift.staffId.name,
+        role: shift.staffId.role,
+        hourlyRate: shift.staffId.hourlyRate,
+        maxHoursPerWeek: shift.staffId.maxHoursPerWeek || 40,
+        contractedHours: shift.staffId.contractedHours || 0,
+        totalHours: 0,
+        shiftCount: 0,
+        shifts: [],
+        dailyHours: {
+          monday: 0, tuesday: 0, wednesday: 0, thursday: 0,
+          friday: 0, saturday: 0, sunday: 0
+        }
+      };
+    }
+
+    staffHoursMap[staffId].totalHours += duration;
+    staffHoursMap[staffId].shiftCount += 1;
+    staffHoursMap[staffId].shifts.push({
+      date: shift.date,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+      duration
+    });
+
+    // Track daily hours
+    const dayName = getDayName(new Date(shift.date)).toLowerCase();
+    if (staffHoursMap[staffId].dailyHours[dayName] !== undefined) {
+      staffHoursMap[staffId].dailyHours[dayName] += duration;
+    }
+  }
+
+  const staffHours = Object.values(staffHoursMap);
+
+  res.json({
+    success: true,
+    data: staffHours
   });
 });
 
@@ -606,6 +686,62 @@ const generateDailyBreakdown = (rota) => {
   });
 
   return breakdown;
+};
+
+// Transform rota data for frontend consumption
+// Groups shifts by template/time/date and collects staff into assignedStaff arrays
+const transformRotaForFrontend = (rota) => {
+  const rotaObj = rota.toObject ? rota.toObject() : rota;
+  
+  // Group shifts by date + template + time
+  const shiftMap = new Map();
+  
+  rotaObj.shifts.forEach(shift => {
+    const key = `${shift.date.toISOString()}_${shift.shiftTemplateId}_${shift.startTime}_${shift.endTime}`;
+    
+    if (!shiftMap.has(key)) {
+      shiftMap.set(key, {
+        id: shift._id,
+        shiftTemplateId: shift.shiftTemplateId,
+        date: shift.date,
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        status: shift.status,
+        requiredRole: shift.shiftTemplateId?.requiredRole,
+        templateName: shift.shiftTemplateId?.name,
+        requiredStaffCount: 1,
+        assignedStaff: []
+      });
+    }
+    
+    // Add staff to assignedStaff array if staff is assigned
+    if (shift.staffId) {
+      const shiftGroup = shiftMap.get(key);
+      shiftGroup.assignedStaff.push({
+        id: shift.staffId._id || shift.staffId,
+        firstName: shift.staffId.firstName || shift.staffId.name?.split(' ')[0] || '',
+        lastName: shift.staffId.lastName || shift.staffId.name?.split(' ')[1] || '',
+        name: shift.staffId.name,
+        role: shift.staffId.role,
+        hourlyRate: shift.staffId.hourlyRate
+      });
+    }
+  });
+  
+  // Convert map to array
+  const groupedShifts = Array.from(shiftMap.values());
+  
+  return {
+    _id: rotaObj._id,
+    weekStartDate: rotaObj.weekStartDate,
+    weekEndDate: rotaObj.weekEndDate,
+    status: rotaObj.status,
+    totalStaffHours: rotaObj.totalStaffHours,
+    totalLaborCost: rotaObj.totalLaborCost,
+    shifts: groupedShifts,
+    createdAt: rotaObj.createdAt,
+    updatedAt: rotaObj.updatedAt
+  };
 };
 
 // Validate shift assignments
@@ -944,6 +1080,7 @@ module.exports = {
   deleteRotaWeek,
   exportRotaAsCSV,
   getRotaStats,
+  getStaffHours,
   validateStaffAssignment,
   getAssignmentScoring,
   validateEntireRota,

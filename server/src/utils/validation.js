@@ -367,21 +367,30 @@ const validateGenerateRota = [
     .isISO8601()
     .withMessage('Week start date must be in YYYY-MM-DD format')
     .custom((value) => {
-      const date = new Date(value);
+      const weekStart = new Date(value);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+      weekStart.setHours(0, 0, 0, 0);
       
-      if (date < today) {
+      // Get the Monday of the current week
+      const currentWeekMonday = new Date(today);
+      const dayOfWeek = today.getDay();
+      const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Adjust for Sunday (0) or other days
+      currentWeekMonday.setDate(today.getDate() + diff);
+      currentWeekMonday.setHours(0, 0, 0, 0);
+      
+      // Allow current week and future weeks
+      if (weekStart < currentWeekMonday) {
         throw new Error('Cannot generate rotas for past weeks');
       }
       
       // Don't allow generating too far in advance (12 weeks)
       const maxAdvanceMs = 12 * 7 * 24 * 60 * 60 * 1000;
-      if (date - today > maxAdvanceMs) {
+      if (weekStart - today > maxAdvanceMs) {
         throw new Error('Cannot generate rotas more than 12 weeks in advance');
       }
       
-      if (date.getDay() !== 1) {
+      if (weekStart.getDay() !== 1) {
         throw new Error('Week start date must be a Monday');
       }
       

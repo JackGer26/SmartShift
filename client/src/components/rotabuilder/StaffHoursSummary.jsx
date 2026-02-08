@@ -221,7 +221,7 @@ const StaffHoursSummary = ({
             
             return (
               <div 
-                key={staff.id} 
+                key={staff.staffId || staff.id || staff.name} 
                 className={`staff-hours-item ${hoursStatus} ${
                   onStaffClick ? 'clickable' : ''
                 }`}

@@ -9,6 +9,7 @@ const {
   getRotaWeekByDate,
   exportRotaAsCSV,
   getRotaStats,
+  getStaffHours,
   validateStaffAssignment,
   getAssignmentScoring,
   validateEntireRota,
@@ -44,6 +45,9 @@ router.get('/:id', validateObjectId, getRotaWeekById);
 
 // GET /api/rota/:id/stats - Get comprehensive rota statistics
 router.get('/:id/stats', validateObjectId, getRotaStats);
+
+// GET /api/rota/:id/staff-hours - Get staff hours summary for rota
+router.get('/:id/staff-hours', validateObjectId, getStaffHours);
 
 // GET /api/rota/:id/export/csv - Export rota as CSV
 // Query params: format (detailed|summary)

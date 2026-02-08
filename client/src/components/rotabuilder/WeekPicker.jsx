@@ -25,8 +25,9 @@ const WeekPicker = ({ selectedWeek, onWeekChange, disabled = false }) => {
   const goToPreviousWeek = () => {
     if (disabled) return;
     
-    const prevWeek = new Date(currentWeek);
-    prevWeek.setDate(currentWeek.getDate() - 7);
+    const current = new Date(currentWeek);
+    const prevWeek = new Date(current);
+    prevWeek.setDate(current.getDate() - 7);
     updateWeek(prevWeek);
   };
 
@@ -34,8 +35,9 @@ const WeekPicker = ({ selectedWeek, onWeekChange, disabled = false }) => {
   const goToNextWeek = () => {
     if (disabled) return;
     
-    const nextWeek = new Date(currentWeek);
-    nextWeek.setDate(currentWeek.getDate() + 7);
+    const current = new Date(currentWeek);
+    const nextWeek = new Date(current);
+    nextWeek.setDate(current.getDate() + 7);
     updateWeek(nextWeek);
   };
 
@@ -79,7 +81,11 @@ const WeekPicker = ({ selectedWeek, onWeekChange, disabled = false }) => {
   // Check if current week is selected
   const isCurrentWeek = () => {
     const now = getWeekStart(new Date());
-    return currentWeek.getTime() === now.getTime();
+    const current = new Date(currentWeek);
+    // Compare dates without time component
+    now.setHours(0, 0, 0, 0);
+    current.setHours(0, 0, 0, 0);
+    return current.getTime() === now.getTime();
   };
 
   // Format individual days for display
@@ -125,21 +131,19 @@ const WeekPicker = ({ selectedWeek, onWeekChange, disabled = false }) => {
         >
           <div className="week-range">
             <span className="week-text">{weekDisplay}</span>
-            {!isCurrentWeek() && (
-              <button
-                className="current-week-btn"
-                onClick={goToCurrentWeek}
-                disabled={disabled}
-                title="Jump to current week (Home)"
-                aria-label="Go to current week"
-              >
-                Today
-              </button>
+            {isCurrentWeek() ? (
+              <span className="week-badge current-week">
+                This Week
+              </span>
+            ) : (
+              <span className="week-badge future-week">
+                Future Week
+              </span>
             )}
           </div>
           
           <div className="week-year">
-            {currentWeek.getFullYear()}
+            {new Date(currentWeek).getFullYear()}
           </div>
         </div>
 

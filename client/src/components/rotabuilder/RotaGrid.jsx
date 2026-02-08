@@ -41,10 +41,21 @@ const RotaGrid = ({
       return daysOfWeek.map(day => ({ ...day, shifts: [] }));
     }
 
+    // Helper to get day of week from date
+    const getDayOfWeek = (dateValue) => {
+      const date = new Date(dateValue);
+      const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      return days[date.getDay()];
+    };
+
     return daysOfWeek.map(day => ({
       ...day,
       shifts: (rotaData.shifts || [])
-        .filter(shift => shift.dayOfWeek.toLowerCase() === day.key)
+        .filter(shift => {
+          // Support both dayOfWeek field and date field
+          const shiftDay = shift.dayOfWeek?.toLowerCase() || getDayOfWeek(shift.date);
+          return shiftDay === day.key;
+        })
         .sort((a, b) => a.startTime.localeCompare(b.startTime))
     }));
   };

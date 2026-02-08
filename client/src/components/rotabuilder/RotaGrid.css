@@ -147,60 +147,70 @@
 
 /* Grid container */
 .grid-container {
-  padding: 20px;
+  padding: 16px;
   overflow-x: auto;
 }
 
 .grid-days {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 16px;
-  min-width: 1000px;
+  gap: 12px;
+  min-width: 900px;
 }
 
-/* Day columns */
-.day-column {
+/* Day columns - scoped to rota-grid */
+.rota-grid .day-column {
   display: flex;
   flex-direction: column;
-  min-height: 400px;
+  min-height: 300px;
+  min-width: 120px;
 }
 
-.day-header {
-  background: #f8f9fa;
-  border-radius: 8px 8px 0 0;
-  padding: 16px;
-  border-bottom: 2px solid #dee2e6;
+.rota-grid .day-header {
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  border-radius: 8px;
+  padding: 12px 8px;
   text-align: center;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+  border: none;
 }
 
-.day-name {
-  margin: 0 0 8px 0;
-  font-size: 16px;
+.rota-grid .day-name {
+  margin: 0 0 6px 0;
+  font-size: 14px;
   font-weight: 700;
-  color: #2c3e50;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.day-stats {
+.rota-grid .day-stats {
   display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  color: #6c757d;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.85);
   font-weight: 500;
 }
 
+.rota-grid .day-stats .shift-count,
+.rota-grid .day-stats .staff-count {
+  white-space: nowrap;
+}
+
 /* Day shifts */
-.day-shifts {
+.rota-grid .day-shifts {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   flex: 1;
 }
 
-.no-shifts {
+.rota-grid .no-shifts {
   text-align: center;
-  padding: 40px 16px;
+  padding: 24px 8px;
   color: #6c757d;
+  font-size: 12px;
   font-style: italic;
   border: 2px dashed #dee2e6;
   border-radius: 8px;
@@ -209,40 +219,39 @@
 
 /* Shift cards */
 .shift-card {
-  border: 2px solid #e9ecef;
-  border-radius: 8px;
-  padding: 16px;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 10px;
   background: white;
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
+  font-size: 12px;
 }
 
 .shift-card:hover {
   border-color: #3498db;
-  box-shadow: 0 2px 8px rgba(52, 152, 219, 0.1);
-  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(52, 152, 219, 0.15);
 }
 
 .shift-card.expanded {
   border-color: #3498db;
-  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.2);
-  transform: none;
+  box-shadow: 0 3px 10px rgba(52, 152, 219, 0.2);
 }
 
 .shift-card.fully-staffed {
-  border-left: 4px solid #28a745;
-  background: linear-gradient(135deg, #ffffff, #f8fff9);
+  border-left: 3px solid #28a745;
+  background: #f8fff9;
 }
 
 .shift-card.understaffed {
-  border-left: 4px solid #ffc107;
-  background: linear-gradient(135deg, #ffffff, #fffbf0);
+  border-left: 3px solid #ffc107;
+  background: #fffbf0;
 }
 
 .shift-card.overstaffed {
-  border-left: 4px solid #dc3545;
-  background: linear-gradient(135deg, #ffffff, #fdf2f2);
+  border-left: 3px solid #dc3545;
+  background: #fdf2f2;
 }
 
 .rota-grid.read-only .shift-card {
@@ -252,30 +261,31 @@
 /* Shift header */
 .shift-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 12px;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
 .shift-time {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   font-weight: 600;
   color: #2c3e50;
+  font-size: 13px;
 }
 
 .start-time, .end-time {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .separator {
   color: #6c757d;
-  margin: 0 2px;
+  margin: 0 1px;
 }
 
 .duration {
-  font-size: 11px;
+  font-size: 10px;
   color: #6c757d;
   font-weight: 500;
   margin-left: 4px;
@@ -288,12 +298,12 @@
 /* Role badges */
 .role-badge {
   display: inline-block;
-  padding: 4px 10px;
-  border-radius: 16px;
-  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 10px;
   font-weight: 600;
   text-transform: capitalize;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
 }
 
 .role-manager {
@@ -337,26 +347,32 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eee;
 }
 
 .shift-name {
-  font-weight: 600;
-  color: #2c3e50;
-  font-size: 13px;
+  font-weight: 500;
+  color: #495057;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60%;
 }
 
 .staffing-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
 }
 
 .staffing-count {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 12px;
+  padding: 2px 6px;
+  border-radius: 10px;
 }
 
 .staffing-count.complete {
@@ -370,12 +386,12 @@
 }
 
 .priority {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 8px;
+  padding: 2px 4px;
+  border-radius: 6px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
 }
 
 .priority-high {
@@ -395,13 +411,13 @@
 
 /* Assigned staff */
 .assigned-staff {
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
 .staff-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .staff-assignment {
@@ -409,15 +425,18 @@
   justify-content: space-between;
   align-items: center;
   background: #f8f9fa;
-  padding: 8px 12px;
-  border-radius: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
   border: 1px solid #e9ecef;
 }
 
 .staff-name {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
   color: #2c3e50;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .remove-staff {
@@ -425,15 +444,17 @@
   color: white;
   border: none;
   border-radius: 50%;
-  width: 20px;
-  height: 20px;
-  font-size: 12px;
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
   font-weight: bold;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+  flex-shrink: 0;
+  margin-left: 4px;
 }
 
 .remove-staff:hover {
@@ -443,42 +464,42 @@
 
 .no-staff {
   text-align: center;
-  padding: 12px;
+  padding: 8px;
   color: #6c757d;
   font-style: italic;
-  font-size: 12px;
+  font-size: 10px;
   background: #f8f9fa;
   border: 1px dashed #dee2e6;
-  border-radius: 6px;
+  border-radius: 4px;
 }
 
 /* Assignment section */
 .assignment-section {
-  margin-top: 12px;
-  padding-top: 12px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px solid #e9ecef;
 }
 
 /* Shift description */
 .shift-description {
-  margin-top: 12px;
-  padding-top: 12px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px solid #e9ecef;
 }
 
 .shift-description p {
   margin: 0;
-  font-size: 12px;
+  font-size: 10px;
   color: #6c757d;
   font-style: italic;
-  line-height: 1.4;
+  line-height: 1.3;
 }
 
 /* Grid footer */
 .grid-footer {
   background: #f8f9fa;
   border-top: 1px solid #dee2e6;
-  padding: 16px 24px;
+  padding: 12px 20px;
 }
 
 .week-summary {
@@ -542,11 +563,11 @@
     gap: 12px;
   }
   
-  .day-header {
+  .rota-grid .day-header {
     padding: 12px;
   }
   
-  .day-name {
+  .rota-grid .day-name {
     font-size: 14px;
   }
   

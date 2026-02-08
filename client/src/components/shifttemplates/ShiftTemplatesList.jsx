@@ -157,6 +157,18 @@ const ShiftTemplatesList = ({
     return roleReqs.map(req => `${req.count} ${formatRoleForDisplay(req.role)}${req.count > 1 ? 's' : ''}`).join(', ');
   };
 
+  // Calculate total staff count from role requirements
+  const getTotalStaffCount = (template) => {
+    const roleReqs = getTemplateRoles(template);
+    return roleReqs.reduce((sum, req) => sum + (req.count || 0), 0);
+  };
+
+  // Debug logging
+  console.log('📋 ShiftTemplatesList received templates:', templates);
+  console.log('📋 Filtered templates:', filteredTemplates);
+  console.log('📋 Templates by day:', templatesByDay);
+  console.log('📋 View mode:', viewMode);
+
   return (
     <div className="shift-templates-list">
       {/* Filters */}
@@ -266,7 +278,7 @@ const ShiftTemplatesList = ({
                           </span>
                         ))}
                       </div>
-                      <span className="staff-count">{template.staffCount} total</span>
+                      <span className="staff-count">{getTotalStaffCount(template)} total</span>
                     </div>
                     
                     <div className="template-priority">
@@ -349,7 +361,7 @@ const ShiftTemplatesList = ({
                         ))}
                       </div>
                     </td>
-                    <td>{template.staffCount}</td>
+                    <td>{getTotalStaffCount(template)}</td>
                     <td>{getPriorityStars(template.priority)}</td>
                     <td>
                       <span className={`status-badge ${template.isActive ? 'active' : 'inactive'}`}>

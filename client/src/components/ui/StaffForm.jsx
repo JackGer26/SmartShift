@@ -11,7 +11,7 @@ const StaffForm = ({ staff = null, onSubmit, onCancel, isLoading = false }) => {
   const [formData, setFormData] = useState({
     name: staff?.name || '',
     email: staff?.email || '',
-    phone: staff?.phone ? formatPhoneForDisplay(staff.phone) : '',
+    phone: staff?.phone || '',
     role: staff?.role || 'waiter',
     hourlyRate: staff?.hourlyRate || '',
     maxHoursPerWeek: staff?.maxHoursPerWeek || 40,
@@ -80,9 +80,9 @@ const StaffForm = ({ staff = null, onSubmit, onCancel, isLoading = false }) => {
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone number is required';
       validationIssues.push('Phone number is required');
-    } else if (!isValidUKPhone(formData.phone)) {
-      newErrors.phone = 'Please enter a valid UK phone number (mobile or landline)';
-      validationIssues.push('Phone number format is invalid for UK');
+    } else if (!/^07\d{9}$/.test(formData.phone.trim())) {
+      newErrors.phone = 'Please enter a valid UK mobile number (07XXXXXXXXX)';
+      validationIssues.push('Phone number must be in format 07XXXXXXXXX (11 digits)');
     }
 
     // Hourly rate validation
@@ -132,19 +132,11 @@ const StaffForm = ({ staff = null, onSubmit, onCancel, isLoading = false }) => {
   };
 
   const handleInputChange = (field, value) => {
-    // Special handling for phone number formatting
-    if (field === 'phone') {
-      const formattedPhone = formatPhoneInput(value);
-      setFormData(prev => ({
-        ...prev,
-        [field]: formattedPhone
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [field]: value
-      }));
-    }
+    // No special formatting for phone - just store as-is
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
 
     // Clear both client and server errors when user starts typing
     if (errors[field] || serverErrors[field]) {
@@ -180,7 +172,7 @@ const StaffForm = ({ staff = null, onSubmit, onCancel, isLoading = false }) => {
     if (validateForm()) {
       const submitData = {
         ...formData,
-        phone: cleanPhoneForStorage(formData.phone), // Clean phone for storage
+        phone: formData.phone, // Submit phone as-is
         hourlyRate: parseFloat(formData.hourlyRate),
         maxHoursPerWeek: parseInt(formData.maxHoursPerWeek)
       };

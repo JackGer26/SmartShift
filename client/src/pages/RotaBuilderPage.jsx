@@ -7,6 +7,7 @@ import {
   removeStaffFromShift,
   publishRota,
   exportRotaCSV,
+  deleteRota,
   getWeekStart,
   getISODateString
 } from '../api/rotaBuilderAPI';
@@ -15,6 +16,7 @@ import WeekPicker from '../components/rotabuilder/WeekPicker';
 import RotaGrid from '../components/rotabuilder/RotaGrid';
 import WarningsPanel from '../components/ui/WarningsPanel';
 import StaffHoursSummary from '../components/rotabuilder/StaffHoursSummary';
+import GenerateRotaModal from '../components/rotabuilder/GenerateRotaModal';
 
 /**
  * RotaBuilderPage - THE CORE ROTA BUILDING INTERFACE
@@ -32,7 +34,7 @@ import StaffHoursSummary from '../components/rotabuilder/StaffHoursSummary';
  * ✅ Export CSV button
  */
 const RotaBuilderPage = () => {
-  const { showSuccess, showError, setLoading } = useAppContext();
+  const { showSuccess, showError } = useAppContext();
   
   // State management
   const [selectedWeek, setSelectedWeek] = useState(getISODateString(getWeekStart(new Date())));
@@ -45,6 +47,7 @@ const RotaBuilderPage = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [showStaffHours, setShowStaffHours] = useState(true);
   const [autoSave, setAutoSave] = useState(true);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -74,12 +77,18 @@ const RotaBuilderPage = () => {
   const loadInitialData = async () => {
     try {
       setPageLoading(true);
+      console.log('🔍 Loading initial data...');
       const staff = await getAllStaff();
+      console.log('📊 Staff loaded:', staff);
+      console.log('📊 Staff count:', staff?.length);
       setStaffList(staff || []);
+      console.log('✅ Staff list set successfully');
     } catch (error) {
+      console.error('❌ Failed to load initial data:', error);
       showError('Failed to load initial data');
     } finally {
       setPageLoading(false);
+      console.log('🏁 Page loading complete');
     }
   };
 
@@ -98,12 +107,12 @@ const RotaBuilderPage = () => {
   };
 
   // Generate draft rota
-  const handleGenerateDraft = async () => {
+  const handleGenerateDraft = async (options) => {
     try {
       setIsGenerating(true);
-      setLoading(true);
+      setShowGenerateModal(false);
       
-      const draftRota = await generateDraftRota(selectedWeek);
+      const draftRota = await generateDraftRota(options.weekStartDate, options);
       setRotaData(draftRota);
       
       showSuccess('Draft rota generated successfully!');
@@ -111,7 +120,6 @@ const RotaBuilderPage = () => {
       showError('Failed to generate draft rota');
     } finally {
       setIsGenerating(false);
-      setLoading(false);
     }
   };
 
@@ -120,7 +128,7 @@ const RotaBuilderPage = () => {
     if (!rotaData) return;
     
     try {
-      await assignStaffToShift(rotaData.id, shiftId, staffId);
+      await assignStaffToShift(rotaData._id, shiftId, staffId);
       
       // Update local state
       const updatedRota = { ...rotaData };
@@ -145,7 +153,7 @@ const RotaBuilderPage = () => {
     if (!rotaData) return;
     
     try {
-      await removeStaffFromShift(rotaData.id, shiftId, staffId);
+      await removeStaffFromShift(rotaData._id, shiftId, staffId);
       
       // Update local state
       const updatedRota = { ...rotaData };
@@ -169,7 +177,7 @@ const RotaBuilderPage = () => {
       setIsPublishing(true);
       setLoading(true);
       
-      const publishedRota = await publishRota(rotaData.id);
+      const publishedRota = await publishRota(rotaData._id);
       setRotaData({ ...rotaData, status: 'published', ...publishedRota });
       
       showSuccess('Rota published successfully! Staff have been notified.');
@@ -187,12 +195,32 @@ const RotaBuilderPage = () => {
     
     try {
       setIsExporting(true);
-      const result = await exportRotaCSV(rotaData.id);
+      const result = await exportRotaCSV(rotaData._id);
       showSuccess(`Rota exported as ${result.filename}`);
     } catch (error) {
       showError('Failed to export rota to CSV');
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  // Handle rota deletion
+  const handleDelete = async () => {
+    if (!rotaData) return;
+    
+    // Confirm deletion
+    const confirmMessage = rotaData.status === 'published' 
+      ? 'This rota is published. Are you sure you want to delete it? This action cannot be undone.'
+      : 'Are you sure you want to delete this draft rota? This action cannot be undone.';
+    
+    if (!window.confirm(confirmMessage)) return;
+    
+    try {
+      await deleteRota(rotaData._id);
+      setRotaData(null);
+      showSuccess('Rota deleted successfully');
+    } catch (error) {
+      showError('Failed to delete rota');
     }
   };
 
@@ -297,7 +325,7 @@ const RotaBuilderPage = () => {
           {/* Generate draft button */}
           <button
             className="btn btn-secondary"
-            onClick={handleGenerateDraft}
+            onClick={() => setShowGenerateModal(true)}
             disabled={isGenerating || rotaLoading || staffList.length === 0}
             title={staffList.length === 0 ? 'Add staff members first' : 'Generate new rota from templates'}
           >
@@ -355,6 +383,17 @@ const RotaBuilderPage = () => {
                 {rotaData?.status === 'published' ? 'Published' : 'Publish Rota'}
               </>
             )}
+          </button>
+
+          {/* Delete button */}
+          <button
+            className="btn btn-danger"
+            onClick={handleDelete}
+            disabled={!rotaData}
+            title={!rotaData ? 'No rota to delete' : 'Delete this rota'}
+          >
+            <span className="btn-icon">🗑️</span>
+            Delete
           </button>
         </div>
       </div>
@@ -471,7 +510,7 @@ const RotaBuilderPage = () => {
       {/* Warnings panel */}
       {rotaData && (
         <WarningsPanel
-          rotaId={rotaData.id}
+          rotaId={rotaData._id}
           onRefresh={handleRefresh}
           autoRefresh={true}
         />
@@ -490,7 +529,7 @@ const RotaBuilderPage = () => {
       {/* Staff hours summary */}
       {showStaffHours && rotaData && (
         <StaffHoursSummary
-          rotaId={rotaData.id}
+          rotaId={rotaData._id}
           staffList={staffList}
           showDetailed={false}
           maxWeeklyHours={40}
@@ -1313,6 +1352,14 @@ const RotaBuilderPage = () => {
           }
         }
       `}</style>
+
+      {/* Generate Rota Modal */}
+      <GenerateRotaModal
+        isOpen={showGenerateModal}
+        onClose={() => setShowGenerateModal(false)}
+        onGenerate={handleGenerateDraft}
+        weekStartDate={selectedWeek}
+      />
     </div>
   );
 };

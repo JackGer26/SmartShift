@@ -92,23 +92,25 @@
   letter-spacing: 0.5px;
 }
 
-.current-week-btn {
-  background: #28a745;
-  color: white;
+.week-badge {
   border: none;
   border-radius: 16px;
   padding: 4px 12px;
   font-size: 12px;
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  display: inline-block;
 }
 
-.current-week-btn:hover {
-  background: #218838;
-  transform: scale(1.05);
+.week-badge.current-week {
+  background: #28a745;
+  color: white;
+}
+
+.week-badge.future-week {
+  background: #dc3545;
+  color: white;
 }
 
 .week-year {

@@ -10,26 +10,33 @@
 
 import { api } from './api';
 
-const API_BASE = '/api/rota';
+const API_BASE = '/rota';
 
 /**
  * Generate a draft rota for a specific week
  * Uses shift templates to create the initial structure
+ * @param {string} weekStartDate - ISO date string for Monday of the week
+ * @param {Object} options - Generation options
+ * @param {Array} options.templateIds - Array of template IDs to use (optional)
+ * @param {Array} options.days - Array of day names to generate (optional)
+ * @param {Boolean} options.autoAssignStaff - Whether to auto-assign staff (default: true)
+ * @param {Boolean} options.useTemplates - Whether to use templates (default: true)
  */
-export const generateDraftRota = async (weekStartDate) => {
+export const generateDraftRota = async (weekStartDate, options = {}) => {
   try {
-    const response = await api(`${API_BASE}/generate-draft`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        weekStartDate,
-        useTemplates: true
-      })
-    });
+    const requestBody = {
+      weekStartDate,
+      useTemplates: options.useTemplates !== undefined ? options.useTemplates : true,
+      autoAssignStaff: options.autoAssignStaff !== undefined ? options.autoAssignStaff : true,
+      templateIds: options.templateIds || null,
+      days: options.days || null
+    };
 
-    return response;
+    const response = await api.post(`${API_BASE}/generate`, requestBody);
+
+    // Backend returns { success, data, analysis, performance, message }
+    // Extract the rota data
+    return response.data || response;
   } catch (error) {
     console.error('Error generating draft rota:', error);
     throw new Error('Failed to generate draft rota');
@@ -41,7 +48,7 @@ export const generateDraftRota = async (weekStartDate) => {
  */
 export const getRotaByWeek = async (weekStartDate) => {
   try {
-    const response = await api(`${API_BASE}/week/${weekStartDate}`);
+    const response = await api.get(`${API_BASE}/week/${weekStartDate}`);
     return response;
   } catch (error) {
     // Return null if no rota exists for this week
@@ -58,13 +65,7 @@ export const getRotaByWeek = async (weekStartDate) => {
  */
 export const assignStaffToShift = async (rotaId, shiftId, staffId) => {
   try {
-    const response = await api(`${API_BASE}/${rotaId}/shifts/${shiftId}/assign`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ staffId })
-    });
+    const response = await api.post(`${API_BASE}/${rotaId}/shifts/${shiftId}/assign`, { staffId });
 
     return response;
   } catch (error) {
@@ -78,13 +79,7 @@ export const assignStaffToShift = async (rotaId, shiftId, staffId) => {
  */
 export const removeStaffFromShift = async (rotaId, shiftId, staffId) => {
   try {
-    const response = await api(`${API_BASE}/${rotaId}/shifts/${shiftId}/remove`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ staffId })
-    });
+    const response = await api.post(`${API_BASE}/${rotaId}/shifts/${shiftId}/remove`, { staffId });
 
     return response;
   } catch (error) {
@@ -105,7 +100,7 @@ export const getAvailableStaff = async (shiftDate, shiftTime, requiredRole) => {
       role: requiredRole
     });
 
-    const response = await api(`${API_BASE}/available-staff?${params}`);
+    const response = await api.get(`${API_BASE}/available-staff?${params}`);
     return response;
   } catch (error) {
     console.error('Error fetching available staff:', error);
@@ -118,7 +113,7 @@ export const getAvailableStaff = async (shiftDate, shiftTime, requiredRole) => {
  */
 export const validateRota = async (rotaId) => {
   try {
-    const response = await api(`${API_BASE}/${rotaId}/validate`);
+    const response = await api.get(`${API_BASE}/${rotaId}/validate`);
     return response;
   } catch (error) {
     console.error('Error validating rota:', error);
@@ -131,7 +126,7 @@ export const validateRota = async (rotaId) => {
  */
 export const getRotaWarnings = async (rotaId) => {
   try {
-    const response = await api(`${API_BASE}/${rotaId}/warnings`);
+    const response = await api.get(`${API_BASE}/${rotaId}/warnings`);
     return response;
   } catch (error) {
     console.error('Error fetching rota warnings:', error);
@@ -144,7 +139,7 @@ export const getRotaWarnings = async (rotaId) => {
  */
 export const getStaffHours = async (rotaId) => {
   try {
-    const response = await api(`${API_BASE}/${rotaId}/staff-hours`);
+    const response = await api.get(`${API_BASE}/${rotaId}/staff-hours`);
     return response;
   } catch (error) {
     console.error('Error fetching staff hours:', error);
@@ -157,12 +152,7 @@ export const getStaffHours = async (rotaId) => {
  */
 export const publishRota = async (rotaId) => {
   try {
-    const response = await api(`${API_BASE}/${rotaId}/publish`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
+    const response = await api.post(`${API_BASE}/${rotaId}/publish`, {});
 
     return response;
   } catch (error) {
@@ -219,13 +209,7 @@ export const exportRotaCSV = async (rotaId) => {
  */
 export const saveDraftRota = async (rotaData) => {
   try {
-    const response = await api(`${API_BASE}/save-draft`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(rotaData)
-    });
+    const response = await api.post(`${API_BASE}/save-draft`, rotaData);
 
     return response;
   } catch (error) {
@@ -239,9 +223,7 @@ export const saveDraftRota = async (rotaData) => {
  */
 export const deleteRota = async (rotaId) => {
   try {
-    const response = await api(`${API_BASE}/${rotaId}`, {
-      method: 'DELETE'
-    });
+    const response = await api.delete(`${API_BASE}/${rotaId}`);
 
     return response;
   } catch (error) {
@@ -255,15 +237,9 @@ export const deleteRota = async (rotaId) => {
  */
 export const copyRotaFromWeek = async (sourceWeekStart, targetWeekStart) => {
   try {
-    const response = await api(`${API_BASE}/copy`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        sourceWeekStart,
-        targetWeekStart
-      })
+    const response = await api.post(`${API_BASE}/copy`, {
+      sourceWeekStart,
+      targetWeekStart
     });
 
     return response;
@@ -278,7 +254,7 @@ export const copyRotaFromWeek = async (sourceWeekStart, targetWeekStart) => {
  */
 export const getRotaSummary = async (rotaId) => {
   try {
-    const response = await api(`${API_BASE}/${rotaId}/summary`);
+    const response = await api.get(`${API_BASE}/${rotaId}/summary`);
     return response;
   } catch (error) {
     console.error('Error fetching rota summary:', error);
@@ -296,7 +272,7 @@ export const getRotasByDateRange = async (startDate, endDate) => {
       endDate
     });
 
-    const response = await api(`${API_BASE}/range?${params}`);
+    const response = await api.get(`${API_BASE}/range?${params}`);
     return response;
   } catch (error) {
     console.error('Error fetching rotas by date range:', error);
@@ -309,13 +285,7 @@ export const getRotasByDateRange = async (startDate, endDate) => {
  */
 export const bulkAssignStaff = async (rotaId, assignments) => {
   try {
-    const response = await api(`${API_BASE}/${rotaId}/bulk-assign`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ assignments })
-    });
+    const response = await api.post(`${API_BASE}/${rotaId}/bulk-assign`, { assignments });
 
     return response;
   } catch (error) {
@@ -363,13 +333,7 @@ export const getISODateString = (date) => {
  */
 export const validateStaffAssignment = async (assignment) => {
   try {
-    const response = await api(`${API_BASE}/validate-assignment`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(assignment)
-    });
+    const response = await api.post(`${API_BASE}/validate-assignment`, assignment);
     
     return response;
   } catch (error) {
@@ -385,9 +349,7 @@ export const validateStaffAssignment = async (assignment) => {
  */
 export const validateEntireRota = async (rotaId) => {
   try {
-    const response = await api(`${API_BASE}/${rotaId}/validate`, {
-      method: 'POST'
-    });
+    const response = await api.post(`${API_BASE}/${rotaId}/validate`, {});
     
     return response;
   } catch (error) {
@@ -403,13 +365,7 @@ export const validateEntireRota = async (rotaId) => {
  */
 export const getAssignmentScoring = async (assignmentDetails) => {
   try {
-    const response = await api(`${API_BASE}/score-assignment`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(assignmentDetails)
-    });
+    const response = await api.post(`${API_BASE}/score-assignment`, assignmentDetails);
     
     return response;
   } catch (error) {

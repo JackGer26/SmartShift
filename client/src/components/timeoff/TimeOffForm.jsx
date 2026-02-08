@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { getAllStaff } from '../../api/staffAPI';
 import { createTimeOff, updateTimeOff } from '../../api/timeOffAPI';
+import { formatRoleForDisplay } from '../../utils/roleUtils';
 import './TimeOffForm.css';
 
 /**
@@ -226,7 +227,7 @@ const TimeOffForm = ({
                   <option value="">Select staff member...</option>
                   {staffList.map(staff => (
                     <option key={staff._id} value={staff._id}>
-                      {staff.name} - {staff.role}
+                      {staff.name} - {formatRoleForDisplay(staff.role)}
                     </option>
                   ))}
                 </select>
